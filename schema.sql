@@ -1,30 +1,30 @@
-CREATE TABLE IF NOT EXISTS categries(
+CREATE TABLE IF NOT EXISTS categories(
     category_id SERIAL PRIMARY KEY,
-    category_name UNIQUE VARCHAR(16)
+    category_name VARCHAR(16) UNIQUE
 ) ;
 
 CREATE TABLE IF NOT EXISTS group_by_counts(
     group_no SERIAL,
-    group_name PRIMARY KEY VARCHAR(16),
-    values NUMERIC(5.1)
+    group_name VARCHAR(16) PRIMARY KEY,
+    values NUMERIC(5,1)
 );
 
 CREATE TABLE IF NOT EXISTS shops(
     shop_id SERIAL PRIMARY KEY,
-    shop_name UNIQUE VARCHA(16)
+    shop_name VARCHAR(16) UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS products(
     product_no SERIAL,
-    product_id UNIQUE VARCHAR(32),
+    product_id VARCHAR(32) UNIQUE,
     maker VARCHAR(32),
-    category_name UNIQUE VARCHAR(16) REFERENCES categories(cateogry_name),
-    shop_name UNIQUE VARCHAR(16) REFERENCES shops(shop_name),
+    category_name VARCHAR(16) UNIQUE REFERENCES categories(category_name),
+    shop_name VARCHAR(16) UNIQUE REFERENCES shops(shop_name),
     group_name VARCHAR(16) REFERENCES group_by_counts(group_name),
-    product_name PRIMARY KEY VARCHAR(64) ,
+    product_name VARCHAR(64) PRIMARY KEY ,
     provisional_name VARCHAR(64),
     quantity_box INTEGER,
-    unit_price NUMERIC(5.1),
+    unit_price NUMERIC(5,1),
     expiry_date TIMESTAMP
 );
 
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS inventory_in(
 );
 
 
-CREATE TABLE IF NOT EXISTS invenotry_out(
+CREATE TABLE IF NOT EXISTS inventory_out(
     out_id SERIAL,
     group_name VARCHAR(16) REFERENCES group_by_counts(group_name),
     shipped_quantity INTEGER,

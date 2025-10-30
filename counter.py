@@ -23,7 +23,7 @@ def get_db_connection():
 
 def init_db():
     conn = get_db_connection()
-    cur = conn.cousor()
+    cur = conn.cursor()
     
     try:
         with app.open_resource('schema.sql', mode="r") as f:
