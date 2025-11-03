@@ -47,14 +47,41 @@ def init_db():
 with app.app_context():
     init_db()
     
+
+def get_db_connection():
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if database_url:
+        conn = psycopg2.connect(database_url)
+        
+    else:
+        conn = psycopg2.connect(
+            host = "db",
+            database = "counter_db",
+            user = "user",
+            password = "futaba0127"
+        )
+        
+    return conn  
     
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/inventory_in')
-def inventory_in():
-    return render_template('inventory_in.html')
+@app.route('/registar')
+def registar():
+    return render_template('registar.html')
+
+
+# @app.route('/inventory_in', mehods = ('GET','POST'))
+# def inventory_in():
+#      conn = None
+#      cur = None
+     
+     
+     
+     
+#     return render_template('inventory_in.html')
 
 @app.route('/inventory_out')
 def inventory_out():
