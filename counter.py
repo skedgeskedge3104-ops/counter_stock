@@ -52,6 +52,22 @@ with app.app_context():
 def index():
     return render_template('index.html')
 
+@app.route('/inventory_in')
+def inventory_in():
+    return render_template('inventory_in.html')
+
+@app.route('/inventory_out')
+def inventory_out():
+    return render_template('inventory_out.html')
+
+@app.route('/counter_stock')
+def counter_stock():
+    return render_template('counter_stock.html')
+
+@app.route('/analysis')
+def analysis():
+    return render_template('analysis.html')
+
 
 if __name__ == '__main__':
     app.run(debug = True, host = '0.0.0.0', port = 8080)
