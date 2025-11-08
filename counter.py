@@ -68,10 +68,45 @@ def get_db_connection():
 def index():
     return render_template('index.html')
 
-@app.route('/registar')
-def registar():
-    return render_template('registar.html')
+@app.route('/register')
+def register():
+    return render_template('register.html')
 
+@app.route('/register_group',methods = ('POST','GET'))
+def register_group():
+    if request.method == 'POST':
+        group_name = request.form.get('group_name')
+        
+        # if not group_name:
+        #     error = '玉数名を入力してください'
+        # if error:
+        #     return render_template('register.html', error=error)
+        
+        conn = None
+        cur = None
+        
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            cur.execute('INSERT INTO group_by_counts(group_name) VALUES(%s);',(group_name,))
+            
+            conn.commit()
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
+                print(f'error:{e}')
+                
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+                
+        return redirect(url_for('index'))
+    
+    return render_template('register_group.html')
 
 # @app.route('/inventory_in', mehods = ('GET','POST'))
 # def inventory_in():

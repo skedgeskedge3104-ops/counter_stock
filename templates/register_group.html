@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}玉数登録{% endblock %}
+
+{% block content %}
+
+<div>
+    <form method="post">
+        <label for="group_name">玉数名</label>
+        <input type="text" id="group_name" name="group_name" required>
+        <br>
+
+        <input type="submit" value="登録">
+    </form>
+    <br><br><br>
+    <a href="index">キャンセルしてメインメニューに戻る</a>
+</div>
+
+
+
+{% endblock %}
