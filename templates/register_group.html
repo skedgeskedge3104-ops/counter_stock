@@ -4,16 +4,20 @@
 
 {% block content %}
 
-<div>
-    <form method="post">
-        <label for="group_name">玉数名</label>
+<div class="menu-container" style="text-align: center;">
+    <h2>玉数登録</h2>
+    <form method="post" onsubmit="alert('登録されました');">
+        <label for="group_name">玉数名</label><br>
         <input type="text" id="group_name" name="group_name" required>
-        <br>
+        <br><br><br>
+        <label for="values">実質玉数（金額）</label>
+        <input type="number" id="values" step="0.01" name="values" min="0">
+        <br><br><br>
 
-        <input type="submit" value="登録">
+        <button type="submit">登録</button>
     </form>
     <br><br><br>
-    <a href="index">キャンセルしてメインメニューに戻る</a>
+    <a href="index">キャンセルしてメニューに戻る</a>
 </div>
 
 

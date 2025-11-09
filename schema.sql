@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS categories(
 CREATE TABLE IF NOT EXISTS group_by_counts(
     group_no SERIAL,
     group_name VARCHAR(16) PRIMARY KEY,
-    values NUMERIC(5,1)
+    values NUMERIC(5,2)
 );
 
 CREATE TABLE IF NOT EXISTS shops(
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS products(
     product_name VARCHAR(64) PRIMARY KEY ,
     provisional_name VARCHAR(64),
     quantity_box INTEGER,
-    unit_price NUMERIC(5,1),
+    unit_price NUMERIC(5,2),
     expiry_date TIMESTAMP
 );
 

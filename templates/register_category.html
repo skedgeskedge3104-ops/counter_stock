@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}カテゴリー登録{% endblock %}
+
+{% block content %}
+
+<div class="menu-container" style="text-align: center;">
+    <h2>カテゴリー登録</h2>
+    <form method="post" onsubmit="alert('登録されました');">
+        <label for="category_name">カテゴリー名</label><br>
+        <input type="text" id="category_name" name="category_name" required>
+        <br><br><br>
+      
+        <button type="submit">登録</button>
+    </form>
+    <br><br><br>
+    <a href="index">キャンセルしてメニューに戻る</a>
+</div>
+
+
+
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}取引先登録{% endblock %}
+
+{% block content %}
+
+<div class="menu-container" style="text-align: center;">
+    <h2>取引先登録</h2>
+    <form method="post" onsubmit="alert('登録されました');">
+        <label for="shop_name">取引先企業名</label><br>
+        <input type="text" id="shop_name" name="shop_name" required>
+        <br><br><br>
+      
+        <button type="submit">登録</button>
+    </form>
+    <br><br><br>
+    <a href="index">キャンセルしてメニューに戻る</a>
+</div>
+
+
+
+{% endblock %}

@@ -76,6 +76,7 @@ def register():
 def register_group():
     if request.method == 'POST':
         group_name = request.form.get('group_name')
+        values = request.form.get('values')
         
         # if not group_name:
         #     error = '玉数名を入力してください'
@@ -89,7 +90,7 @@ def register_group():
             conn = get_db_connection()
             cur = conn.cursor()
             
-            cur.execute('INSERT INTO group_by_counts(group_name) VALUES(%s);',(group_name,))
+            cur.execute('INSERT INTO group_by_counts(group_name, values) VALUES(%s,%s);',(group_name, values,))
             
             conn.commit()
             
@@ -107,6 +108,67 @@ def register_group():
         return redirect(url_for('index'))
     
     return render_template('register_group.html')
+
+@app.route('/register_shop', methods=['GET','POST'])
+def register_shop():
+    if request.method == 'POST':
+        shop_name = request.form.get('shop_name')
+        
+        cur = None
+        conn = None
+        
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            cur.execute('INSERT INTO shops(shop_name) VALUES(%s);',(shop_name,))
+            
+            conn.commit()
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
+                print(f'error:{e}')
+                
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+                
+        return redirect(url_for('index'))
+
+    return render_template('register_shop.html')
+
+@app.route('/register_category', methods=['GET','POST'])
+def register_category():
+    if request.method == 'POST':
+        category_name = request.form.get('category_name')
+        
+        cur = None
+        conn = None
+        
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute('INSERT INTO categories(category_name) VALUES(%s);', (category_name,))
+            
+            conn.commit()
+            
+        except Exception as e:
+            if conn:
+                conn.rollback()
+                print(f'error:{e}')
+                
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+        return redirect(url_for('index'))
+    
+    return render_template('register_category.html')
+            
 
 # @app.route('/inventory_in', mehods = ('GET','POST'))
 # def inventory_in():
