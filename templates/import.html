@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block title %}ｃｓｖインポート{% endblock %}
+
+{% block content %}
+<div class="menu-container">
+    <h2>インポートして入庫</h2>
+    <p>※対応はcsvのみ</p>
+    <form method="POST" enctype="multipart/form-data" onsubmit="alert('登録されました')">
+        <div>
+            <label for="file" class="form-label">csvファイルの選択</label><br><br><br>
+            <input type="file" name="file" class="form-control" accept=".csv">
+        </div>
+        <br><br>
+        <button type="submit" class="btn-primary" >インポートして入庫</button>
+    </form>
+    <br><br><br>
+    <a href="/">キャンセルしてメニューに戻る</a>
+</div>
+
+
+
+
+{% endblock %}

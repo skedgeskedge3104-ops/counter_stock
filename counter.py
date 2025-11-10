@@ -170,15 +170,15 @@ def register_category():
     return render_template('register_category.html')
             
 
-# @app.route('/inventory_in', mehods = ('GET','POST'))
-# def inventory_in():
-#      conn = None
-#      cur = None
-     
-     
-     
-     
-#     return render_template('inventory_in.html')
+@app.route('/inventory_in', methods = ('GET','POST'))
+def inventory_in():
+    return render_template('inventory_in.html')
+
+@app.route('/import', methods=['GET','POST'])
+def import_csv():
+    return render_template('import.html')
+
+
 
 @app.route('/inventory_out')
 def inventory_out():
