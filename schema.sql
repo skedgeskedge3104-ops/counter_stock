@@ -14,6 +14,11 @@ CREATE TABLE IF NOT EXISTS shops(
     shop_name VARCHAR(16) UNIQUE
 );
 
+CREATE TABLE IF NOT EXISTS provisional_table(
+    group_name VARCHAR(16) REFERENCES group_by_counts(group_name),
+    provisional_name VARCHAR(64) PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS products(
     product_no SERIAL,
     product_id VARCHAR(32) UNIQUE,
@@ -22,7 +27,7 @@ CREATE TABLE IF NOT EXISTS products(
     shop_name VARCHAR(16) UNIQUE REFERENCES shops(shop_name),
     group_name VARCHAR(16) REFERENCES group_by_counts(group_name),
     product_name VARCHAR(64) PRIMARY KEY ,
-    provisional_name VARCHAR(64),
+    provisional_name VARCHAR(64) REFERENCES provisional_table(provisional_name),
     quantity_box INTEGER,
     unit_price NUMERIC(5,2),
     expiry_date TIMESTAMP
@@ -32,7 +37,7 @@ CREATE TABLE IF NOT EXISTS inventory_in(
     in_id SERIAL,
     group_name VARCHAR(16) REFERENCES group_by_counts(group_name),
     product_name VARCHAR(64) REFERENCES products(product_name),
-    received_quani INTEGER,
+    received_quantity INTEGER,
     received_day TIMESTAMP
 );
 
@@ -40,6 +45,8 @@ CREATE TABLE IF NOT EXISTS inventory_in(
 CREATE TABLE IF NOT EXISTS inventory_out(
     out_id SERIAL,
     group_name VARCHAR(16) REFERENCES group_by_counts(group_name),
+    provisional_name VARCHAR(64) REFERENCES provisional_table(provisional_name),
     shipped_quantity INTEGER,
     shipped_day TIMESTAMP
 );
+
