@@ -290,9 +290,62 @@ def import_csv():
 
 
 
-@app.route('/inventory_out')
+@app.route('/inventory_out', methods=['GET','POST'])
 def inventory_out():
+    if request.method == 'POST':
+        group_name = request.form.get('group_name')
+        provisional_name = request.form.get('provisional_name')
+        shipped_quantity = request.form.get('shipped_quantity')
+        
+        conn = None
+        cur = None
+        
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute('INSERT INTO inventory_out (group_name,provisioinal_name,shipped_quantity) VALUES (%s,%s,%s);', (group_name,provisional_name,shipped_quantity,))
+            
+            conn.commit()
+            
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+            return redirect(url_for('index'))
+        
+        except Exception as e:
+            conn.rollback()
+            return f'error:{e}'
+        
     return render_template('inventory_out.html')
+
+@app.route('/provisional_table', methods=['GET','POST'])
+def provisional_table():
+    if request.method == 'POST':
+        group_name = request.form.get('group_name')
+        provisional_name = request.form.get('provisional_name')
+        
+        conn = None
+        cur = None
+        
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute('INSERT INTO provisional_table(group_name,provisional_name) VALUES(%s,%s);', (group_name, provisional_name,))
+            
+            conn.commit()
+            
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+            return redirect(url_for('index'))
+                
+        except Exception as e:
+            conn.rollback()
+            return f'error:{e}'
+        
+    return render_template('provisional_table.html')
 
 @app.route('/counter_stock')
 def counter_stock():

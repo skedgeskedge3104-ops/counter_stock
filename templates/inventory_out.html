@@ -3,8 +3,19 @@
 {% block title %}出庫{% endblock %}
 
 {% block content %}
-
-<p>invenotry_out</p>
-
-
+    <div class="menu-container" style="text-align: center;">
+        <h2>出庫</h2>
+        <br>
+        <form method="post" onsubmit="alert('登録されました')">
+            <label for="group_name">玉数</label><br>
+            <input type="text" id="group_name" name="group_name" required><br><br>
+            <label for="provisional_name">商品名</label><br>
+            <input type="text" id="provisional_name" name="provisional_name" required><br><br>
+            <label for="shipped_quantity">出庫数</label><br>
+            <input type="number" step="1" min="0" id="shipped_quantity" name="shipped_quantity"><br><br>
+            <button type="submit">登録</button>
+        </form>
+        <a href="/">メニューに戻る</a><br>
+        <a href="provisional_table">出庫名の登録</a>
+    </div>
 {% endblock %}
