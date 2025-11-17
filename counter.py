@@ -174,7 +174,42 @@ def register_category():
 
 @app.route('/register_product', methods=['GET','POST'])
 def register_product():
-    if request.method == 'POST':
+    if request.method =='GET':
+        group_names = []
+        category_names = []
+        shop_names = []
+        provisional_names = []
+        conn = None
+        
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            
+            cur.execute('SELECT group_name FROM group_by_counts;')
+            group_names = [row[0] for row in cur.fetchall()]
+            
+            cur.execute('SELECT category_name FROM categories;')
+            category_names = [row[0] for row in cur.fetchall()]
+            
+            cur.execute('SELECT shop_name FROM shops;')
+            shop_names = [row[0] for row in cur.fetchall()]
+            
+            cur.execute('SELECT provisional_name FROM provisional_table;')
+            provisional_names = [row[0] for row in cur.fetchall()]
+            
+            cur.close()
+            
+        except Exception as e:
+            print(f'error:{e}')
+            
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+        return render_template('register_product.html', group_names=group_names, category_names = category_names,shop_names = shop_names, provisional_names = provisional_names)
+    
+    elif request.method == 'POST':
         product_id = request.form.get('product_id')
         maker = request.form.get('maker')
         category_name = request.form.get('category_name')
@@ -303,7 +338,7 @@ def inventory_out():
         try:
             conn = get_db_connection()
             cur = conn.cursor()
-            cur.execute('INSERT INTO inventory_out (group_name,provisioinal_name,shipped_quantity) VALUES (%s,%s,%s);', (group_name,provisional_name,shipped_quantity,))
+            cur.execute('INSERT INTO inventory_out (group_name,provisional_name,shipped_quantity) VALUES (%s,%s,%s);', (group_name,provisional_name,shipped_quantity,))
             
             conn.commit()
             
@@ -339,7 +374,7 @@ def provisional_table():
                 cur.close()
             if conn:
                 conn.close()
-            return redirect(url_for('index'))
+            return redirect(url_for('provisional_table'))
                 
         except Exception as e:
             conn.rollback()

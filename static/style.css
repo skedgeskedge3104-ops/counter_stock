@@ -40,7 +40,7 @@ body{
 }
 
 
-a{
+a,button{
     display: inline-block;
     text-decoration: none;
     color: var(--light-bg);
@@ -142,23 +142,16 @@ form{
 } */
 
 
-input[type="text"]
-input[type="number"]{
-    width: calc(100%-22px);
+input[type="text"],
+input[type="number"],
+select{
+    width: calc(100% - 22px);
     padding: 10px;
     margin-top: 5px;
     margin-bottom: 20px;
-    border: 1pxsolidvar(--border-color);
+    border: 1px solid var(--secondary-color);
     border-radius: 4px;
     box-sizing: border-box;
 }
 
 
-.btn-primary{
-    background-color: #007bff;
-    color: var(--white);
-    border: none;
-    border-radius: 4px;
-    padding: 10px20px;
-    cursor: pointer;
-}
