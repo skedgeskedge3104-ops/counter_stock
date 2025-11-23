@@ -64,7 +64,7 @@ def get_db_connection():
             password = "futaba0127"
         )
         
-    return conn  
+    return conn 
     
 @app.route('/')
 def index():
