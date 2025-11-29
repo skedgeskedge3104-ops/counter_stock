@@ -227,7 +227,7 @@ def register_product():
             conn = get_db_connection()
             cur = conn.cursor()
             
-            cur.execute('INSERT INTO products(product_id, maker, category_name, shop_name, group_name, product_name, provisional_name, quantity_box, unit_price) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);', (product_id, maker, category_name, shop_name, group_name, product_name, provisional_name, quantity_box, unit_price, ) )
+            cur.execute("INSERT INTO products(product_id, maker, category_name, shop_name, group_name, product_name, provisional_name, quantity_box, unit_price,expiry_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, timezone('Asia/Tokyo',now()));", (product_id, maker, category_name, shop_name, group_name, product_name, provisional_name, quantity_box, unit_price,))
             
             conn.commit()
             
@@ -247,6 +247,28 @@ def register_product():
 
 @app.route('/inventory_in', methods = ('GET','POST'))
 def inventory_in():
+    group_names =  []
+    product_names = []
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        cur.execute('SELECT * FROM group_by_counts;')
+        group_names = [row[1] for row in cur.fetchall()]
+        
+        cur.execute('SELECT product_name FROM products;')
+        product_names = [row[0] for row in cur.fetchall()]
+        
+        cur.close()
+        
+    except Exception as e:
+        print(f'error:{e}')
+        
+    finally:
+        cur.close()
+        conn.close()
+            
     if request.method == 'post':
         group_name = request.form.get('group_name')
         product_name = request.form.get('product_name')
@@ -275,7 +297,7 @@ def inventory_in():
     
         return redirect(url_for('inventory_in'))
         
-    return render_template('inventory_in.html')
+    return render_template('inventory_in.html', group_names = group_names, product_names = product_names)
 
 @app.route('/import', methods=['GET','POST'])
 def import_csv():
@@ -382,9 +404,29 @@ def provisional_table():
         
     return render_template('provisional_table.html')
 
+
 @app.route('/counter_stock')
 def counter_stock():
-    return render_template('counter_stock.html')
+    conn = None
+    cur = None
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM products;')
+        
+        items = cur.fetchall()
+        
+    except Exception as e:
+        print(f'error:{e}')
+        
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+            
+    return render_template('counter_stock.html', items = items)
 
 @app.route('/analysis')
 def analysis():

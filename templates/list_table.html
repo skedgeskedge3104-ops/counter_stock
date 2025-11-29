@@ -3,7 +3,33 @@
 {% block title %}リスト内容{% endblcok %}
 
 {% block content %}
-    <h2>list</h2>
+    <h2>商品リスト</h2>
+
+    <div id="inv_in_list">
+        <table>
+            <thead>
+                <tr>
+                    <th>入庫ID</th>
+                    <th>玉数</th>
+                    <th>商品名</th>
+                    <th>入庫数量</th>
+                    <th>入庫日</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item im items %}
+                <tr>
+                    <td>{{ item[0] }}</td>
+                    <td>{{ item[1] }}</td>
+                    <td>{{ item[2] }}</td>
+                    <td>{{ item[3] }}</td>
+                    <td>{{ item[4] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
   
     
 

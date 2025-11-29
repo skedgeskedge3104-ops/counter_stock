@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS inventory_out(
     shipped_day TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS cigarette(
+CREATE TABLE IF NOT EXISTS tobacco(
     inv_id SERIAL PRIMARY KEY,
     product_name VARCHAR(64) REFERENCES products(product_name),
     box_count INTEGER,
