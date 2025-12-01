@@ -76,6 +76,16 @@ def register():
 
 @app.route('/register_group',methods = ('POST','GET'))
 def register_group():
+    conn = None
+    cur = None
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM group_by_counts;')
+    group_by_counts = cur.fetchall()
+    cur.close()
+    conn.close()
+    
     if request.method == 'POST':
         group_name = request.form.get('group_name')
         values = request.form.get('values')
@@ -107,12 +117,24 @@ def register_group():
             if conn:
                 conn.close()
                 
-        return redirect(url_for('index'))
+        return redirect(url_for('register_group'))
     
-    return render_template('register_group.html')
+    return render_template('register_group.html',group_by_counts = group_by_counts)
 
 @app.route('/register_shop', methods=['GET','POST'])
 def register_shop():
+    conn = None
+    cur = None
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM shops;')
+    shops = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+
+    
     if request.method == 'POST':
         shop_name = request.form.get('shop_name')
         
@@ -138,9 +160,9 @@ def register_shop():
             if conn:
                 conn.close()
                 
-        return redirect(url_for('index'))
+        return redirect(url_for('register_shop'))
 
-    return render_template('register_shop.html')
+    return render_template('register_shop.html', shops = shops)
 
 @app.route('/register_category', methods=['GET','POST'])
 def register_category():
@@ -247,6 +269,9 @@ def register_product():
 
 @app.route('/inventory_in', methods = ('GET','POST'))
 def inventory_in():
+    
+    
+    
     group_names =  []
     product_names = []
     
@@ -259,6 +284,10 @@ def inventory_in():
         
         cur.execute('SELECT product_name FROM products;')
         product_names = [row[0] for row in cur.fetchall()]
+        
+        cur.execute('SELECT * FROM inventory_in; ')
+        
+        inventory_in = cur.fetchall()
         
         cur.close()
         
@@ -281,7 +310,7 @@ def inventory_in():
             conn = get_db_connection()
             cur = conn.cursor()
             
-            cur.execute('INSERT INTO inventory_in(group_name, product_name,received_quantity) VALUES (%s, %s, %s);', (group_name, product_name,received_quantity,))
+            cur.execute("INSERT INTO inventory_in(group_name, product_name,received_quantity,received_day) VALUES (%s, %s, %s, timezone('Asia/Tokyo',now()));", (group_name, product_name,received_quantity,))
             
             conn.commit()
             
@@ -292,12 +321,13 @@ def inventory_in():
                 
         except Exception as e:
             conn.rollback()
+            print(f'error:{e}')
             return f'error:{e}'
         
     
         return redirect(url_for('inventory_in'))
         
-    return render_template('inventory_in.html', group_names = group_names, product_names = product_names)
+    return render_template('inventory_in.html', group_names = group_names, product_names = product_names, inventory_in = inventory_in)
 
 @app.route('/import', methods=['GET','POST'])
 def import_csv():
@@ -378,6 +408,17 @@ def inventory_out():
 
 @app.route('/provisional_table', methods=['GET','POST'])
 def provisional_table():
+    conn = None
+    cur = None
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM provisional_table;')
+    provisional = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
     if request.method == 'POST':
         group_name = request.form.get('group_name')
         provisional_name = request.form.get('provisional_name')
@@ -402,7 +443,7 @@ def provisional_table():
             conn.rollback()
             return f'error:{e}'
         
-    return render_template('provisional_table.html')
+    return render_template('provisional_table.html', provisional = provisional)
 
 
 @app.route('/counter_stock')

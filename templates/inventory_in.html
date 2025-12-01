@@ -3,35 +3,63 @@
 {% block title %}入庫{% endblock %}
 
 {% block content %}
-<div class="menu-container" style="text-align: center;">
-    <h2>入庫</h2>
-    <form method="post" onsubmit="alert('登録されました');">
-        <label for="group_name">玉数名</label><br>
-        <select name="group_name" id="group_name">
-            <option value="disabled selected">玉数選択</option>
-            {% for g_name in group_names %}
-                <option value="{{g_name}}">{{g_name}}</option>
-            {% endfor %}
-        </select>
-        <br><br>
-        <label for="product_name">商品名</label><br>
-        <select name="product_name" id="product_name">
-            <option value="disabled selected">商品名選択</option>
-            {% for p_name in product_names %}
-                <option value="{{p_name}}">{{p_name}}</option>
-            {% endfor %}
-        </select>
-        <br><br>
-        <label for="received_quantity">入庫数</label><br>
-        <input type="number" id="received_quantity" name="received_quantity" required>
-        <br><br>
-      
-        <button type="submit">登録</button>
-    </form>
-    <br><br><br>
 
-    <a href="import">ｃｓｖから入庫する</a><br>
-    <a href="/">メインメニューに戻る</a>
+<body style="display: flex;">
+    
+
+    <div class="menu-container" style="text-align: center;">
+        <h2>入庫</h2>
+        <form method="post" onsubmit="alert('登録されました');">
+            <label for="group_name">玉数名</label><br>
+            <select name="group_name" id="group_name">
+                <option value="disabled selected">玉数選択</option>
+                {% for g_name in group_names %}
+                    <option value="{{g_name}}">{{g_name}}</option>
+                {% endfor %}
+            </select>
+            <br><br>
+            <label for="product_name">商品名</label><br>
+            <select name="product_name" id="product_name">
+                <option value="disabled selected">商品名選択</option>
+                {% for p_name in product_names %}
+                    <option value="{{p_name}}">{{p_name}}</option>
+                {% endfor %}
+            </select>
+            <br><br>
+            <label for="received_quantity">入庫数</label><br>
+            <input type="number" id="received_quantity" name="received_quantity" required>
+            <br><br>
+        
+            <button type="submit">登録</button>
+        </form>
+        <br><br><br>
+
+        <a href="import">ｃｓｖから入庫する</a><br>
+        <a href="/">メインメニューに戻る</a>
     </div>
+
+    <table style="width: auto;  text-align: center; margin: 50px auto;" >
+        <thead>
+            <tr>
+                <th>玉数名</th>
+                <th>商品名</th>
+                <th>入庫数</th>
+                <th>入庫日</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in inventory_in %}
+            <tr>
+                <td>{{ item[1] }}</td>
+                <td>{{ item[2] }}</td>
+                <td>{{ item[3] }}</td>
+                <td>{{ item[4].strftime('%y,%m,%d')  }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+</body>
  
 {% endblock %}

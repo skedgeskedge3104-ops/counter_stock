@@ -94,8 +94,8 @@ table{
 
 th, td{
     border: 1pxsolidvar(--border-color);
-    padding: 10px;
-    text-align: left;
+    padding: 20px;
+    text-align: center;
 }
 
 

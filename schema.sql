@@ -21,10 +21,10 @@ CREATE TABLE IF NOT EXISTS provisional_table(
 
 CREATE TABLE IF NOT EXISTS products(
     product_no SERIAL,
-    product_id VARCHAR(32) UNIQUE,
+    product_id VARCHAR(32),
     maker VARCHAR(32),
-    category_name VARCHAR(16) UNIQUE REFERENCES categories(category_name),
-    shop_name VARCHAR(16) UNIQUE REFERENCES shops(shop_name),
+    category_name VARCHAR(16) REFERENCES categories(category_name),
+    shop_name VARCHAR(16) REFERENCES shops(shop_name),
     group_name VARCHAR(16) REFERENCES group_by_counts(group_name),
     product_name VARCHAR(64) PRIMARY KEY ,
     provisional_name VARCHAR(64) REFERENCES provisional_table(provisional_name),
