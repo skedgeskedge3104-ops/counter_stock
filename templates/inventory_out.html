@@ -3,14 +3,27 @@
 {% block title %}出庫{% endblock %}
 
 {% block content %}
+<body style="display: flex;">
     <div class="menu-container" style="text-align: center;">
         <h2>出庫</h2>
         <br>
         <form method="post" onsubmit="alert('登録されました')">
             <label for="group_name">玉数</label><br>
-            <input type="text" id="group_name" name="group_name" required><br><br>
+            <select name="group_name" id="group_name">
+                <option value="disabled selected">玉数選択</option>
+                 {% for g_name in group_names %}
+                    <option value="{{g_name}}">{{g_name}}</option>
+                {% endfor %}
+            </select><br><br>
             <label for="provisional_name">商品名</label><br>
-            <input type="text" id="provisional_name" name="provisional_name" required><br><br>
+            <select name="provisional_name" id="provisional_name">
+                <option value="disabled selected">商品名</option>
+                {% for p_name in provisional_names %}
+                    <option value="{{p_name}}">{{p_name}}</option>
+                {% endfor %}
+            </select>
+            
+            <br><br>
             <label for="shipped_quantity">出庫数</label><br>
             <input type="number" step="1" min="0" id="shipped_quantity" name="shipped_quantity"><br><br>
             <button type="submit">登録</button>
@@ -18,4 +31,26 @@
         <a href="/">メニューに戻る</a><br>
         <a href="provisional_table">出庫名の登録</a>
     </div>
+
+    <table style="width: auto;  text-align: center; margin: 50px auto;" >
+        <thead>
+            <tr>
+                <th>玉数名</th>
+                <th>商品名</th>
+                <th>出庫数</th>
+                <th>出庫日</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in inventory_out %}
+            <tr>
+                <td>{{ item[1] }}</td>
+                <td>{{ item[2] }}</td>
+                <td>{{ item[3] }}</td>
+                <td>{{ item[4].strftime('%y,%m,%d')  }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
 {% endblock %}

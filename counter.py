@@ -3,6 +3,8 @@ import psycopg2
 from flask import Flask, render_template,request,redirect,url_for,jsonify
 from io import TextIOWrapper
 import csv
+import datetime
+import pytz
 
 app=Flask(__name__)
 
@@ -269,9 +271,6 @@ def register_product():
 
 @app.route('/inventory_in', methods = ('GET','POST'))
 def inventory_in():
-    
-    
-    
     group_names =  []
     product_names = []
     
@@ -285,7 +284,7 @@ def inventory_in():
         cur.execute('SELECT product_name FROM products;')
         product_names = [row[0] for row in cur.fetchall()]
         
-        cur.execute('SELECT * FROM inventory_in; ')
+        cur.execute("SELECT * FROM inventory_in WHERE DATE(received_day) = DATE(timezone('Asia/Tokyo',now())); ")
         
         inventory_in = cur.fetchall()
         
@@ -295,10 +294,12 @@ def inventory_in():
         print(f'error:{e}')
         
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
             
-    if request.method == 'post':
+    if request.method == 'POST':
         group_name = request.form.get('group_name')
         product_name = request.form.get('product_name')
         received_quantity = request.form.get('received_quantity')
@@ -379,32 +380,49 @@ def import_csv():
 
 @app.route('/inventory_out', methods=['GET','POST'])
 def inventory_out():
-    if request.method == 'POST':
-        group_name = request.form.get('group_name')
-        provisional_name = request.form.get('provisional_name')
-        shipped_quantity = request.form.get('shipped_quantity')
+    group_names = []
+    provisional_names = []
+    
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
         
-        conn = None
-        cur = None
+        cur.execute('SELECT * FROM group_by_counts;')
+        group_names = [row[1] for row in cur.fetchall()]
         
-        try:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute('INSERT INTO inventory_out (group_name,provisional_name,shipped_quantity) VALUES (%s,%s,%s);', (group_name,provisional_name,shipped_quantity,))
+        cur.execute('SELECT provisional_name FROM provisional_table;')
+        provisional_names = [row[0] for row in cur.fetchall()]
+        
+        cur.execute("SELECT * FROM inventory_out WHERE DATE(shipped_day)=DATE(timezone('Asia/Tokyo',now()));")
+        inventory_out = cur.fetchall()
+
+        
+        if request.method == 'POST':
+            group_name = request.form.get('group_name')
+            provisional_name = request.form.get('provisional_name')
+            shipped_quantity = request.form.get('shipped_quantity')
+            
+          
+            cur.execute("INSERT INTO inventory_out (group_name,provisional_name,shipped_quantity,shipped_day) VALUES (%s,%s,%s,timezone('Asia/Tokyo', now()));", (group_name,provisional_name,shipped_quantity,))
             
             conn.commit()
             
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-            return redirect(url_for('index'))
-        
-        except Exception as e:
-            conn.rollback()
-            return f'error:{e}'
-        
-    return render_template('inventory_out.html')
+            return redirect(url_for('inventory_out'))
+            
+        return render_template('inventory_out.html', group_names=group_names, provisional_names=provisional_names, inventory_out = inventory_out)
+    
+    except Exception as e:
+                conn.rollback()
+                return f'error:{e}'
+            
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()        
+    
 
 @app.route('/provisional_table', methods=['GET','POST'])
 def provisional_table():
