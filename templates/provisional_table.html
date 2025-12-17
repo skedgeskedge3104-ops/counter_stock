@@ -11,7 +11,13 @@
         <p style="text-align: left;">ここでは、出庫時の名前を登録します。ここに登録すると、うまい棒みたいに何種類も味がある場合、すべて「うまい棒」として扱うことができます。</p><br><br>
         <form method="POST" onsubmit="alert('登録されました')">  
             <label for="group_name">玉数名</label><br>
-            <input type="text" id="group_name" name="group_name" required><br><br>
+            <select name="group_name" id="group_name">
+                <option value="disabled selected">玉数選択</option>
+                {% for g_name in group_names %}
+                    <option value="{{g_name}}">{{g_name}}</option>
+                {% endfor %}
+            </select>
+            <br><br>
             <label for="provisional_name">出庫時の名前</label><br>
             <input type="text" id="provisional_name" name="provisional_name" required>
             <br><br>

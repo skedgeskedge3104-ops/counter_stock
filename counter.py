@@ -426,12 +426,18 @@ def inventory_out():
 
 @app.route('/provisional_table', methods=['GET','POST'])
 def provisional_table():
+    group_names = []
+    
     conn = None
     cur = None
     
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT * FROM provisional_table;')
+    
+    cur.execute('SELECT * FROM group_by_counts;')
+    group_names = [row[1] for row in cur.fetchall()]
+    
+    cur.execute('SELECT * FROM provisional_table ORDER BY group_name;')
     provisional = cur.fetchall()
     
     cur.close()
@@ -461,7 +467,7 @@ def provisional_table():
             conn.rollback()
             return f'error:{e}'
         
-    return render_template('provisional_table.html', provisional = provisional)
+    return render_template('provisional_table.html', provisional = provisional,  group_names = group_names)
 
 
 @app.route('/counter_stock')
