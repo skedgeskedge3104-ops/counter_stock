@@ -11,8 +11,8 @@
         <h2>入庫</h2>
         <form method="post" onsubmit="alert('登録されました');">
             <label for="group_name">玉数名</label><br>
-            <select name="group_name" id="group_name">
-                <option value="disabled selected">玉数選択</option>
+            <select name="group_name" id="group_name" onchange="getProductData()">
+                <option value="" disabled selected>玉数選択</option>
                 {% for g_name in group_names %}
                     <option value="{{g_name}}">{{g_name}}</option>
                 {% endfor %}
@@ -20,10 +20,7 @@
             <br><br>
             <label for="product_name">商品名</label><br>
             <select name="product_name" id="product_name">
-                <option value="disabled selected">商品名選択</option>
-                {% for p_name in product_names %}
-                    <option value="{{p_name}}">{{p_name}}</option>
-                {% endfor %}
+                <option value=" disabled selected">商品名選択</option>
             </select>
             <br><br>
             <label for="received_quantity">入庫数</label><br>
@@ -58,7 +55,32 @@
             {% endfor %}
         </tbody>
     </table>
+<script>
+    async function getProductData(){
+        const groupSelect = document.getElementById('group_name');
+        const productSelect = document.getElementById('product_name');
 
+        const selectedGroup = groupSelect.value;
+
+        if (!selectedGroup) return;
+
+        try{
+            const response = await fetch(`/get_product_names/${selectedGroup}`);
+            const data = await response.json();
+
+            productSelect.innerHTML = '<option value="" disabled selected>商品名を選択</option>';
+
+            data.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                productSelect.appendChild(option);
+            });
+        }catch(error){
+            console.error('Fetch error:', error)
+        }
+    }
+</script>
 
 </body>
  

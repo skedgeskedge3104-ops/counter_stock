@@ -438,6 +438,20 @@ def get_provisional_names(group_name):
     # PythonのリストをJSON形式（JavaScriptが読める形式）で返す
     return jsonify(provisional_names)
 
+@app.route('/get_product_names/<group_name>')
+def get_product_names(group_name):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute('SELECT product_name FROM products WHERE group_name = %s;',(group_name,))
+    product_names = [row[0] for row in cur.fetchall()]
+    
+    cur.close()
+    conn.close()    
+    
+    return jsonify(product_names)
+    
+
 @app.route('/provisional_table', methods=['GET','POST'])
 def provisional_table():
     group_names = []
