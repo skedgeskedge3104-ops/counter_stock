@@ -9,20 +9,19 @@
         <br>
         <form method="post" onsubmit="alert('登録されました')">
             <label for="group_name">玉数</label><br>
-            <select name="group_name" id="group_name">
-                <option value="disabled selected">玉数選択</option>
-                 {% for g_name in group_names %}
+            <select name="group_name" id="group_name" onchange="getProvisionalData()">
+                <option value="" disabled selected>玉数選択</option>
+                {% for g_name in group_names %}
                     <option value="{{g_name}}">{{g_name}}</option>
                 {% endfor %}
-            </select><br><br>
-            <label for="provisional_name">商品名</label><br>
-            <select name="provisional_name" id="provisional_name">
-                <option value="disabled selected">商品名</option>
-                {% for p_name in provisional_names %}
-                    <option value="{{p_name}}">{{p_name}}</option>
-                {% endfor %}
             </select>
-            
+
+            <br><br>
+
+<label for="provisional_name">商品名</label><br>
+<select name="provisional_name" id="provisional_name">
+    <option value="" disabled selected>先に玉数を選択してください</option>
+    </select>
             <br><br>
             <label for="shipped_quantity">出庫数</label><br>
             <input type="number" step="1" min="0" id="shipped_quantity" name="shipped_quantity"><br><br>
@@ -53,4 +52,36 @@
         </tbody>
     </table>
 </body>
+
+
+<script>
+async function getProvisionalData() {
+    const groupSelect = document.getElementById('group_name');
+    const provisionalSelect = document.getElementById('provisional_name');
+    
+    // 選択された「玉数」の値を取得
+    const selectedGroup = groupSelect.value;
+    
+    if (!selectedGroup) return;
+
+    try {
+        // ステップ2で作ったAPIにリクエストを投げる（非同期通信）
+        const response = await fetch(`/get_provisional_names/${selectedGroup}`);
+        const data = await response.json(); // JSONとして解析
+
+        // 「商品名」のドロップダウンを一旦クリア
+        provisionalSelect.innerHTML = '<option value="" disabled selected>商品名を選択</option>';
+
+        // 取得したデータを一つずつoptionタグにして追加
+        data.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            provisionalSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Fetch error:', error);
+    }
+}
+</script>
 {% endblock %}

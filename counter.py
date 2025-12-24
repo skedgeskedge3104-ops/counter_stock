@@ -421,8 +421,22 @@ def inventory_out():
         if cur:
             cur.close()
         if conn:
-            conn.close()        
+            conn.close()     
+               
+@app.route('/get_provisional_names/<group_name>')
+def get_provisional_names(group_name):
+    conn = get_db_connection()
+    cur = conn.cursor()
     
+    # 選択されたgroup_nameに紐づく商品名だけを取得
+    cur.execute('SELECT provisional_name FROM provisional_table WHERE group_name = %s;', (group_name,))
+    provisional_names = [row[0] for row in cur.fetchall()]
+    
+    cur.close()
+    conn.close()
+    
+    # PythonのリストをJSON形式（JavaScriptが読める形式）で返す
+    return jsonify(provisional_names)
 
 @app.route('/provisional_table', methods=['GET','POST'])
 def provisional_table():
