@@ -38,6 +38,7 @@
                 <th>商品名</th>
                 <th>出庫数</th>
                 <th>出庫日</th>
+                <th>編集</th>
             </tr>
         </thead>
         <tbody>
@@ -47,8 +48,17 @@
                 <td>{{ item[2] }}</td>
                 <td>{{ item[3] }}</td>
                 <td>{{ item[4].strftime('%y,%m,%d')  }}</td>
+                <td>
+                    <form action="{{url_for('edit_out',out_id=item[0])}}" style="display: inline;">
+                        <input type="submit" value="編集">
+                    </form>
+                    <form action="{{url_for('delete_out',out_id=item[0])}}" onsubmit="return confirm('本当に削除しますか？')" method="post" style="display: inline;">
+                        <input type="submit" value="削除">
+                    </form>
+                </td>
             </tr>
             {% endfor %}
+
         </tbody>
     </table>
 </body>

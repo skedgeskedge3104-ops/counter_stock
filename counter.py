@@ -422,6 +422,31 @@ def inventory_out():
             cur.close()
         if conn:
             conn.close()     
+            
+@app.route('/<int:out_id>/edit_out',methods=('GET','POST'))            
+def edit_out(out_id):
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM inventory_out WHERE out_id = %s',(out_id,))
+    item = cur.fetchone()
+    
+    if request.method =='POST':
+        shipped_quantity = request.form.get('shipeed_quantity')
+        cur.execute('UPDATE inventory_out SET shipped_quantity = %s;',(shipped_quantity,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return redirect(url_for('inventory_out',out_id=out_id))
+        
+    cur.close()
+    conn.close()
+    
+    return render_template('inventory_out.html', item=item)
+    
+    
+            
+
                
 @app.route('/get_provisional_names/<group_name>')
 def get_provisional_names(group_name):
