@@ -50,4 +50,4 @@ RUN chmod +x wait-for-it.sh
 
 
 # ポートの公開 (Flask/Gunicornのデフォルトポート)
-EXPOSE 8080
+EXPOSE 8081

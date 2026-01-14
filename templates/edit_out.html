@@ -4,24 +4,27 @@
 
 {% block content %}
 <body style="display: flex;">
-    <table style="width: auto;  text-align: center; margin: 50px auto;" >
-        <thead>
-            <tr>
-                <th>玉数名</th>
-                <th>商品名</th>
-                <th>出庫数</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>{{ item[1] }}</td>
-                <td>{{ item[2] }}</td>
-                <td>
-                    <label for="shipped_quantity">出庫数</label><br>
-                    <input type="number" step="1" min="0" id="shipped_quantity" name="shipped_quantity" value="{{item[3]}}">
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <form method="post">
+        <table style="width: auto;  text-align: center; margin: 50px auto;" >
+            <thead>
+                <tr>
+                    <th>玉数名</th>
+                    <th>商品名</th>
+                    <th>出庫数</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{ item[1] }}</td>
+                    <td>{{ item[2] }}</td>
+                    <td>
+                        <label for="shipped_quantity">出庫数</label><br>
+                        <input type="number" step="1" min="0" id="shipped_quantity" name="shipped_quantity" value="{{item[3]}}">
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <input type="submit" value="変更の保存"></input>
+    </form>
 </body>
 {% endblock %}

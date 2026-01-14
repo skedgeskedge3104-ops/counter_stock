@@ -94,7 +94,7 @@ table{
 
 th, td{
     border: 1pxsolidvar(--border-color);
-    padding: 20px;
+    padding: 5px;
     text-align: center;
 }
 
@@ -120,7 +120,7 @@ tr:nth-child(even){
 
 form{
     background: var(--white);
-    padding: 20px;
+    padding: 5px;
     border-radius: 6px;
     border: 1pxsolidvar(--white);
     margin-bottom: 20px;

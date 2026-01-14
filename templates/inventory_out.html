@@ -48,11 +48,12 @@
                 <td>{{ item[2] }}</td>
                 <td>{{ item[3] }}</td>
                 <td>{{ item[4].strftime('%y,%m,%d')  }}</td>
+
                 <td>
-                    <form action="{{url_for('edit_out',out_id=item[0])}}" style="display: inline;">
+                    <form action="{{url_for('edit_out',out_id=item[0])}}" style="display: block;">
                         <input type="submit" value="編集">
                     </form>
-                    <form action="{{url_for('delete_out',out_id=item[0])}}" onsubmit="return confirm('本当に削除しますか？')" method="post" style="display: inline;">
+                    <form action="{{url_for('delete_out',out_id=item[0])}}" onsubmit="return confirm('本当に削除しますか？')" method="post" style="display: block;">
                         <input type="submit" value="削除">
                     </form>
                 </td>

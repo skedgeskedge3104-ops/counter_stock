@@ -423,7 +423,7 @@ def inventory_out():
         if conn:
             conn.close()     
             
-@app.route('/<int:out_id>/edit_out',methods=('GET','POST'))            
+@app.route('/<int:out_id>/edit_out',methods=['GET','POST'])            
 def edit_out(out_id):
     
     conn = get_db_connection()
@@ -432,19 +432,30 @@ def edit_out(out_id):
     item = cur.fetchone()
     
     if request.method =='POST':
-        shipped_quantity = request.form.get('shipeed_quantity')
-        cur.execute('UPDATE inventory_out SET shipped_quantity = %s;',(shipped_quantity,))
+        shipped_quantity = request.form.get('shipped_quantity')
+        cur.execute('UPDATE inventory_out SET shipped_quantity = %s WHERE out_id=%s;',(shipped_quantity,out_id,))
         conn.commit()
         cur.close()
         conn.close()
-        return redirect(url_for('inventory_out',out_id=out_id))
+        return redirect(url_for('inventory_out'))
         
     cur.close()
     conn.close()
     
-    return render_template('inventory_out.html', item=item)
+    return render_template('edit_out.html', item=item)
     
+@app.route('/<int:out_id>/delete',methods=['POST'])
+def delete_out(out_id):
     
+    conn=get_db_connection()
+    cur=conn.cursor()
+    cur.execute('DELETE FROM inventory_out WHERE out_id = %s',(out_id,))
+    conn.commit()
+    
+    cur.close()
+    conn.close()
+    
+    return redirect(url_for('inventory_out'))
             
 
                
@@ -552,4 +563,4 @@ def analysis():
 
 
 if __name__ == '__main__':
-    app.run(debug = True, host = '0.0.0.0', port = 8080)
+    app.run(debug = True, host = '0.0.0.0', port = 8081)
