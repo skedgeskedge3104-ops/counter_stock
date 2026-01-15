@@ -91,11 +91,7 @@ def register_group():
     if request.method == 'POST':
         group_name = request.form.get('group_name')
         values = request.form.get('values')
-        
-        # if not group_name:
-        #     error = '玉数名を入力してください'
-        # if error:
-        #     return render_template('register.html', error=error)
+
         
         conn = None
         cur = None
@@ -218,9 +214,6 @@ def register_product():
             cur.execute('SELECT shop_name FROM shops;')
             shop_names = [row[0] for row in cur.fetchall()]
             
-            cur.execute('SELECT provisional_name FROM provisional_table;')
-            provisional_names = [row[0] for row in cur.fetchall()]
-            
             cur.close()
             
         except Exception as e:
@@ -231,7 +224,7 @@ def register_product():
                 cur.close()
             if conn:
                 conn.close()
-        return render_template('register_product.html', group_names=group_names, category_names = category_names,shop_names = shop_names, provisional_names = provisional_names)
+        return render_template('register_product.html', group_names=group_names, category_names = category_names,shop_names = shop_names)
     
     elif request.method == 'POST':
         product_id = request.form.get('product_id')
@@ -240,7 +233,6 @@ def register_product():
         shop_name = request.form.get('shop_name')
         group_name = request.form.get('group_name')
         product_name = request.form.get('product_name')
-        provisional_name = request.form.get('provisional_name')
         quantity_box = request.form.get('quantity_box')
         unit_price = request.form.get('unit_price')
         
@@ -251,7 +243,7 @@ def register_product():
             conn = get_db_connection()
             cur = conn.cursor()
             
-            cur.execute("INSERT INTO products(product_id, maker, category_name, shop_name, group_name, product_name, provisional_name, quantity_box, unit_price,expiry_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, timezone('Asia/Tokyo',now()));", (product_id, maker, category_name, shop_name, group_name, product_name, provisional_name, quantity_box, unit_price,))
+            cur.execute("INSERT INTO products(product_id, maker, category_name, shop_name, group_name, product_name, quantity_box, unit_price,expiry_date) VALUES (%s, %s, %s,  %s, %s, %s, %s, %s, timezone('Asia/Tokyo',now()));", (product_id, maker, category_name, shop_name, group_name, product_name, quantity_box, unit_price,))
             
             conn.commit()
             

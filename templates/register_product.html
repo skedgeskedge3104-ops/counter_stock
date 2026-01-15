@@ -40,14 +40,6 @@
         <label for="product_name">商品名</label><br>
         <input type="text" id="product_name" name="product_name" required>
         <br>
-        <label for="provisional_name">出庫時の通称</label><br>
-        <select name="provisional_name" id="provisional_name">
-            <option value="disabled selected">通称選択</option>
-            {% for p_name in provisional_names %}
-                <option value="{{p_name}}">{{p_name}}</option>
-            {% endfor %}
-        </select>
-        <br>
         <label for="quantity_box">入り数</label><br>
         <input type="number" id="quantity_box" name="quantity_box" min="0" required>
         <br>
