@@ -9,7 +9,7 @@
         <br>
         <form method="post" onsubmit="alert('登録されました')">
             <label for="group_name">玉数</label><br>
-            <select name="group_name" id="group_name" onchange="getProvisionalData()">
+            <select name="group_name" id="group_name" onchange="getProductData()">
                 <option value="" disabled selected>玉数選択</option>
                 {% for g_name in group_names %}
                     <option value="{{g_name}}">{{g_name}}</option>
@@ -18,8 +18,8 @@
 
             <br><br>
 
-<label for="provisional_name">商品名</label><br>
-<select name="provisional_name" id="provisional_name">
+<label for="product_name">商品名</label><br>
+<select name="product_name" id="product_name">
     <option value="" disabled selected>先に玉数を選択してください</option>
     </select>
             <br><br>
@@ -28,7 +28,7 @@
             <button type="submit">登録</button>
         </form>
         <a href="/">メニューに戻る</a><br>
-        <a href="provisional_table">出庫名の登録</a>
+      
     </div>
 
     <table style="width: auto;  text-align: center; margin: 50px auto;" >
@@ -66,9 +66,9 @@
 
 
 <script>
-async function getProvisionalData() {
+async function getProductData() {
     const groupSelect = document.getElementById('group_name');
-    const provisionalSelect = document.getElementById('provisional_name');
+    const productSelect = document.getElementById('product_name');
     
     // 選択された「玉数」の値を取得
     const selectedGroup = groupSelect.value;
@@ -77,18 +77,18 @@ async function getProvisionalData() {
 
     try {
         // ステップ2で作ったAPIにリクエストを投げる（非同期通信）
-        const response = await fetch(`/get_provisional_names/${selectedGroup}`);
+        const response = await fetch(`/get_product_names/${selectedGroup}`);
         const data = await response.json(); // JSONとして解析
 
         // 「商品名」のドロップダウンを一旦クリア
-        provisionalSelect.innerHTML = '<option value="" disabled selected>商品名を選択</option>';
+        productSelect.innerHTML = '<option value="" disabled selected>商品名を選択</option>';
 
         // 取得したデータを一つずつoptionタグにして追加
         data.forEach(name => {
             const option = document.createElement('option');
             option.value = name;
             option.textContent = name;
-            provisionalSelect.appendChild(option);
+            productSelect.appendChild(option);
         });
     } catch (error) {
         console.error('Fetch error:', error);

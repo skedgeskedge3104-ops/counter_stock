@@ -373,7 +373,6 @@ def import_csv():
 @app.route('/inventory_out', methods=['GET','POST'])
 def inventory_out():
     group_names = []
-    provisional_names = []
     
     conn = None
     cur = None
@@ -384,8 +383,8 @@ def inventory_out():
         cur.execute('SELECT * FROM group_by_counts;')
         group_names = [row[1] for row in cur.fetchall()]
         
-        cur.execute('SELECT provisional_name FROM provisional_table;')
-        provisional_names = [row[0] for row in cur.fetchall()]
+        cur.execute('SELECT product_name FROM products;')
+        product_names = [row[0] for row in cur.fetchall()]
         
         cur.execute("SELECT * FROM inventory_out WHERE DATE(shipped_day)=DATE(timezone('Asia/Tokyo',now()));")
         inventory_out = cur.fetchall()
@@ -393,17 +392,17 @@ def inventory_out():
         
         if request.method == 'POST':
             group_name = request.form.get('group_name')
-            provisional_name = request.form.get('provisional_name')
+            product_name = request.form.get('product_name')
             shipped_quantity = request.form.get('shipped_quantity')
             
           
-            cur.execute("INSERT INTO inventory_out (group_name,provisional_name,shipped_quantity,shipped_day) VALUES (%s,%s,%s,timezone('Asia/Tokyo', now()));", (group_name,provisional_name,shipped_quantity,))
+            cur.execute("INSERT INTO inventory_out (group_name,product_name,shipped_quantity,shipped_day) VALUES (%s,%s,%s,timezone('Asia/Tokyo', now()));", (group_name,product_name,shipped_quantity,))
             
             conn.commit()
             
             return redirect(url_for('inventory_out'))
             
-        return render_template('inventory_out.html', group_names=group_names, provisional_names=provisional_names, inventory_out = inventory_out)
+        return render_template('inventory_out.html', group_names=group_names, product_names=product_names, inventory_out = inventory_out)
     
     except Exception as e:
                 conn.rollback()
