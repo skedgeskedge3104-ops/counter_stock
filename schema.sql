@@ -1,9 +1,9 @@
-CREATE TABLE categories (
+ CREATE TABLE IF NOT EXISTS categories (
     category_id SERIAL PRIMARY KEY,
     category_name VARCHAR(16) UNIQUE NOT NULL
 );
 
-CREATE TABLE group_by_counts (
+CREATE TABLE  IF NOT EXISTS group_by_counts (
     group_no SERIAL,
     group_name VARCHAR(16) PRIMARY KEY,
     values NUMERIC(5,2),
@@ -11,13 +11,13 @@ CREATE TABLE group_by_counts (
         REFERENCES categories(category_name)
 );
 
-CREATE TABLE shops (
+CREATE TABLE  IF NOT EXISTS shops (
     shop_id SERIAL PRIMARY KEY,
     shop_name VARCHAR(16) UNIQUE NOT NULL
 );
 
 
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     product_no SERIAL,
     product_id VARCHAR(32),
     maker VARCHAR(32),
@@ -36,7 +36,7 @@ ALTER TABLE products
 ADD CONSTRAINT products_product_group_unique
 UNIQUE (product_name, group_name);
 
-CREATE TABLE inventory_in (
+CREATE TABLE IF NOT EXISTS inventory_in (
     in_id SERIAL PRIMARY KEY,
     product_name VARCHAR(64) NOT NULL,
     group_name VARCHAR(16) NOT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE inventory_in (
 );
 
 
-CREATE TABLE inventory_out (
+CREATE TABLE IF NOT EXISTS inventory_out (
     out_id SERIAL PRIMARY KEY,
     product_name VARCHAR(64) NOT NULL,
     group_name VARCHAR(16) NOT NULL,
@@ -57,7 +57,7 @@ CREATE TABLE inventory_out (
         REFERENCES products(product_name, group_name)
 );
 
-CREATE TABLE tobacco_inventory_check (
+CREATE TABLE IF NOT EXISTS tobacco_inventory_check (
     check_id SERIAL PRIMARY KEY,
     product_name VARCHAR(64) NOT NULL
         REFERENCES products(product_name),
@@ -65,12 +65,12 @@ CREATE TABLE tobacco_inventory_check (
         REFERENCES group_by_counts(group_name),
 
     check_date DATE NOT NULL,
-    
-    box_count INTEGER NOT NULL,
+
     in_shelf_count INTEGER NOT NULL,
     unit_count INTEGER NOT NULL,
+    pos_stock INTEGER NOT NULL,
 
-    checked_by VARCHAR(32),      -- 誰が数えたか（将来用）
+    checked_by VARCHAR(32),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     UNIQUE (product_name, group_name, check_date)

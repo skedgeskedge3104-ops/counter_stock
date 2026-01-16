@@ -449,22 +449,6 @@ def delete_out(out_id):
     return redirect(url_for('inventory_out'))
             
 
-               
-@app.route('/get_provisional_names/<group_name>')
-def get_provisional_names(group_name):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    # 選択されたgroup_nameに紐づく商品名だけを取得
-    cur.execute('SELECT provisional_name FROM provisional_table WHERE group_name = %s;', (group_name,))
-    provisional_names = [row[0] for row in cur.fetchall()]
-    
-    cur.close()
-    conn.close()
-    
-    # PythonのリストをJSON形式（JavaScriptが読める形式）で返す
-    return jsonify(provisional_names)
-
 @app.route('/get_product_names/<group_name>')
 def get_product_names(group_name):
     conn = get_db_connection()
@@ -478,51 +462,6 @@ def get_product_names(group_name):
     
     return jsonify(product_names)
     
-
-@app.route('/provisional_table', methods=['GET','POST'])
-def provisional_table():
-    group_names = []
-    
-    conn = None
-    cur = None
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    cur.execute('SELECT * FROM group_by_counts;')
-    group_names = [row[1] for row in cur.fetchall()]
-    
-    cur.execute('SELECT * FROM provisional_table ORDER BY group_name;')
-    provisional = cur.fetchall()
-    
-    cur.close()
-    conn.close()
-    
-    if request.method == 'POST':
-        group_name = request.form.get('group_name')
-        provisional_name = request.form.get('provisional_name')
-        
-        conn = None
-        cur = None
-        
-        try:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute('INSERT INTO provisional_table(group_name,provisional_name) VALUES(%s,%s);', (group_name, provisional_name,))
-            
-            conn.commit()
-            
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-            return redirect(url_for('provisional_table'))
-                
-        except Exception as e:
-            conn.rollback()
-            return f'error:{e}'
-        
-    return render_template('provisional_table.html', provisional = provisional,  group_names = group_names)
 
 
 @app.route('/counter_stock')
@@ -558,53 +497,68 @@ def tobacco_check():
     cur = conn.cursor()
 
     if request.method == 'POST':
-        cur.execute("""
-            INSERT INTO tobacco_inventory_check
-            (product_name, group_name, check_date,
-             in_shelf_count, unit_count, pos_stock)
-            VALUES (%s, %s, CURRENT_DATE, %s, %s, %s)
-            ON CONFLICT (product_name, group_name, check_date)
-            DO UPDATE SET
-                in_shelf_count = EXCLUDED.in_shelf_count,
-                unit_count     = EXCLUDED.unit_count,
-                pos_stock      = EXCLUDED.pos_stock
-        """, (
-            request.form['product_name'],
-            request.form['group_name'],
-            request.form['in_shelf_count'],
-            request.form['unit_count'],
-            request.form['pos_stock']
-        ))
+        data = request.form.to_dict(flat=False)
+
+        for i in range(len(data['product_name'])):
+            cur.execute("""
+                INSERT INTO tobacco_inventory_check
+                (product_name, group_name, db_stock, in_shelf, unit_count)
+                VALUES (%s,%s,%s,%s,%s)
+            """, (
+                data['product_name'][i],
+                data['group_name'][i],
+                data['db_stock'][i],
+                data['in_shelf'][i],
+                data['unit_count'][i]
+            ))
 
         conn.commit()
+        cur.close()
+        conn.close()
         return redirect(url_for('tobacco_result'))
 
-    cur.execute("SELECT group_name FROM group_by_counts ORDER BY group_name")
-    groups = cur.fetchall()
+    cur.execute("""
+        SELECT
+            p.product_name,
+            p.group_name,
+            COALESCE(SUM(i.received_quantity),0)
+          - COALESCE(SUM(o.shipped_quantity),0) AS db_stock
+        FROM products p
+        LEFT JOIN inventory_in i ON p.product_name = i.product_name
+        LEFT JOIN inventory_out o ON p.product_name = o.product_name
+        WHERE p.category_name = 'たばこ'
+        GROUP BY p.product_name, p.group_name
+        ORDER BY p.group_name, p.product_name
+    """)
 
+    products = cur.fetchall()
     cur.close()
     conn.close()
 
-    return render_template('tobacco_check.html', groups=groups)
+    return render_template('tobacco_check.html', products=products)
+
 
 # -----------------------------
 # 棚卸結果表示
 # -----------------------------
-@app.route('/tobacco/result')
+@app.route('/tobacco_result')
 def tobacco_result():
     conn = get_db_connection()
     cur = conn.cursor()
 
     cur.execute("""
         SELECT
-            group_name,
-            SUM(db_stock)       AS db_stock,
-            SUM(actual_stock)   AS actual_stock,
-            SUM(pos_stock)      AS pos_stock,
-            SUM(diff)           AS diff
-        FROM tobacco_inventory_diff
-        GROUP BY group_name
-        ORDER BY group_name
+            g.group_name,
+            SUM(
+                COALESCE(tic.db_stock,0)
+            + COALESCE(tic.in_shelf_count,0)
+            + COALESCE(tic.unit_count,0)
+            )AS actual_stock
+        FROM group_by_counts g
+        JOIN tobacco_inventory_check tic
+            ON g.group_name = tic.group_name
+        GROUP BY g.group_name
+        ORDER BY g.group_name;
     """)
 
     results = cur.fetchall()
@@ -612,6 +566,7 @@ def tobacco_result():
     conn.close()
 
     return render_template('tobacco_result.html', results=results)
+
 
 
 

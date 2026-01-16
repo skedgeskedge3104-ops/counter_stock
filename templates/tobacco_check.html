@@ -7,61 +7,33 @@
 <h2>たばこ棚卸入力</h2>
 
 <form method="post">
-    <label>グループ</label><br>
-    <select id="group_name" name="group_name" onchange="getProductData()" required>
-        <option value="">選択</option>
-        {% for g in groups %}
-            <option value="{{ g[0] }}">{{ g[0] }}</option>
-        {% endfor %}
-    </select>
-    <br><br>
+<table border="1">
+<tr>
+    <th>銘柄</th>
+    <th>DB在庫</th>
+    <th>in_shelf</th>
+    <th>unit_count</th>
+</tr>
 
-    <label>商品名</label><br>
-    <select id="product_name" name="product_name" required>
-        <option value="">商品名を選択</option>
-    </select>
-    <br><br>
+{% for p in products %}
+<tr>
+    <td>{{ p[0] }}</td>
+    <td>{{ p[2] }}</td>
 
-    <label>in_shelf（非陳列）</label><br>
-    <input type="number" name="in_shelf_count" min="0" required>
-    <br><br>
+    <input type="hidden" name="product_name" value="{{ p[0] }}">
+    <input type="hidden" name="group_name" value="{{ p[1] }}">
+    <input type="hidden" name="db_stock" value="{{ p[2] }}">
 
-    <label>unit_count（陳列）</label><br>
-    <input type="number" name="unit_count" min="0" required>
-    <br><br>
+    <td><input type="number" name="in_shelf" value="0"></td>
+    <td><input type="number" name="unit_count" value="0"></td>
+</tr>
+{% endfor %}
+</table>
 
-    <label>POS在庫</label><br>
-    <input type="number" name="pos_stock" min="0" required>
-    <br><br>
-
-    <input type="submit" value="保存">
+<br>
+<a href="tobacco_result">次へ</a>
 </form>
 
-<a href="tobacco_result.html">結果表示</a>
 
-<script>
-async function getProductData() {
-    const groupSelect = document.getElementById('group_name');
-    const productSelect = document.getElementById('product_name');
-
-    const selectedGroup = groupSelect.value;
-    if (!selectedGroup) return;
-
-    const response = await fetch(`/get_product_names/${selectedGroup}`);
-    const data = await response.json();
-
-    productSelect.innerHTML = '<option value="">商品名を選択</option>';
-
-    data.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        productSelect.appendChild(option);
-    });
-}
-</script>
-
-</body>
-</html>
 
 {% endblock %}

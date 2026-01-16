@@ -3,49 +3,38 @@
 {% block title %}棚卸結果{% endblock %}
 
 {% block content %}
-<style>
-    .diff {
-        font-weight: bold;
-    }
-    .plus {
-        color: red;
-    }
-    .minus {
-        color: blue;
-    }
-</style>
-</head>
-<body>
 
 <h2>棚卸結果（GROUP別・本日）</h2>
 
-<table border="1" cellpadding="6">
-    <tr>
-        <th>GROUP</th>
-        <th>DB在庫</th>
-        <th>実地在庫</th>
-        <th>POS在庫</th>
-        <th>差異</th>
-    </tr>
+<table border="1">
+<tr>
+    <th>GROUP</th>
+    <th>実地在庫</th>
+    <th>POS在庫</th>
+    <th>差異</th>
+</tr>
 
-    {% for r in results %}
-    <tr>
-        <td>{{ r[0] }}</td>
-        <td>{{ r[1] }}</td>
-        <td>{{ r[2] }}</td>
-        <td>{{ r[3] }}</td>
-        <td class="diff {% if r[4] > 0 %}plus{% elif r[4] < 0 %}minus{% endif %}">
-            {{ r[4] }}
-        </td>
-    </tr>
-    {% endfor %}
+{% for r in results %}
+<tr>
+    <td>{{ r[0] }}</td>
+    <td class="actual">{{ r[1] }}</td>
+    <td>
+        <input type="number" class="pos" oninput="calcDiff(this)">
+    </td>
+    <td class="diff">0</td>
+</tr>
+{% endfor %}
 </table>
+<a href="index.html">メニューに戻る</a>
+<script>
+function calcDiff(input) {
+    const row = input.closest('tr');
+    const actual = Number(row.querySelector('.actual').textContent);
+    const pos = Number(input.value || 0);
+    row.querySelector('.diff').textContent = actual - pos;
+}
+</script>
 
-<br>
-<a href="{{ url_for('tobacco_check') }}">← 入力に戻る</a>
-
-</body>
-</html>
 
 
 {% endblock %}
