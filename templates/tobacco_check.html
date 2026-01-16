@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+
+{% block title %}たばこ棚卸入力{% endblock %}
+
+{% block content %}
+
+<h2>たばこ棚卸入力</h2>
+
+<form method="post">
+    <label>グループ</label><br>
+    <select id="group_name" name="group_name" onchange="getProductData()" required>
+        <option value="">選択</option>
+        {% for g in groups %}
+            <option value="{{ g[0] }}">{{ g[0] }}</option>
+        {% endfor %}
+    </select>
+    <br><br>
+
+    <label>商品名</label><br>
+    <select id="product_name" name="product_name" required>
+        <option value="">商品名を選択</option>
+    </select>
+    <br><br>
+
+    <label>in_shelf（非陳列）</label><br>
+    <input type="number" name="in_shelf_count" min="0" required>
+    <br><br>
+
+    <label>unit_count（陳列）</label><br>
+    <input type="number" name="unit_count" min="0" required>
+    <br><br>
+
+    <label>POS在庫</label><br>
+    <input type="number" name="pos_stock" min="0" required>
+    <br><br>
+
+    <input type="submit" value="保存">
+</form>
+
+<a href="tobacco_result.html">結果表示</a>
+
+<script>
+async function getProductData() {
+    const groupSelect = document.getElementById('group_name');
+    const productSelect = document.getElementById('product_name');
+
+    const selectedGroup = groupSelect.value;
+    if (!selectedGroup) return;
+
+    const response = await fetch(`/get_product_names/${selectedGroup}`);
+    const data = await response.json();
+
+    productSelect.innerHTML = '<option value="">商品名を選択</option>';
+
+    data.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        productSelect.appendChild(option);
+    });
+}
+</script>
+
+</body>
+</html>
+
+{% endblock %}

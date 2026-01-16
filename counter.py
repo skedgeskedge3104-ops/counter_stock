@@ -548,6 +548,74 @@ def counter_stock():
             
     return render_template('counter_stock.html', items = items)
 
+
+# -----------------------------
+# 棚卸入力画面
+# -----------------------------
+@app.route('/tobacco_check', methods=['GET', 'POST'])
+def tobacco_check():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if request.method == 'POST':
+        cur.execute("""
+            INSERT INTO tobacco_inventory_check
+            (product_name, group_name, check_date,
+             in_shelf_count, unit_count, pos_stock)
+            VALUES (%s, %s, CURRENT_DATE, %s, %s, %s)
+            ON CONFLICT (product_name, group_name, check_date)
+            DO UPDATE SET
+                in_shelf_count = EXCLUDED.in_shelf_count,
+                unit_count     = EXCLUDED.unit_count,
+                pos_stock      = EXCLUDED.pos_stock
+        """, (
+            request.form['product_name'],
+            request.form['group_name'],
+            request.form['in_shelf_count'],
+            request.form['unit_count'],
+            request.form['pos_stock']
+        ))
+
+        conn.commit()
+        return redirect(url_for('tobacco_result'))
+
+    cur.execute("SELECT group_name FROM group_by_counts ORDER BY group_name")
+    groups = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template('tobacco_check.html', groups=groups)
+
+# -----------------------------
+# 棚卸結果表示
+# -----------------------------
+@app.route('/tobacco/result')
+def tobacco_result():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            group_name,
+            SUM(db_stock)       AS db_stock,
+            SUM(actual_stock)   AS actual_stock,
+            SUM(pos_stock)      AS pos_stock,
+            SUM(diff)           AS diff
+        FROM tobacco_inventory_diff
+        GROUP BY group_name
+        ORDER BY group_name
+    """)
+
+    results = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return render_template('tobacco_result.html', results=results)
+
+
+
+
 @app.route('/analysis')
 def analysis():
     return render_template('analysis.html')
