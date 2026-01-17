@@ -1,12 +1,13 @@
 import os
 import psycopg2
-from flask import Flask, render_template,request,redirect,url_for,jsonify
+from flask import Flask, render_template,request,redirect,url_for,jsonify,session
 from io import TextIOWrapper
 import csv
 import datetime
 import pytz
 
 app=Flask(__name__)
+app.secret_key = "super-secret-key"
 
 
 def get_db_connection():
@@ -488,54 +489,60 @@ def counter_stock():
     return render_template('counter_stock.html', items = items)
 
 
-# -----------------------------
-# 棚卸入力画面
-# -----------------------------
-@app.route('/tobacco_check', methods=['GET', 'POST'])
-def tobacco_check():
+-----------------------------
+棚卸入力画面
+-----------------------------
+@app.route('/tobacco_check/confirm', methods=['POST'])
+def tobacco_check_confirm():
     conn = get_db_connection()
     cur = conn.cursor()
+    data = request.json
 
-    if request.method == 'POST':
-        data = request.form.to_dict(flat=False)
+    for row in data:
+        cur.execute("""
+            INSERT INTO tobacco_inventory_check (
+              product_name,
+              group_name,
+              db_stock,
+              in_shelf_count,
+              unit_count,
+              pos_stock,
+              actual_stock,
+              diff_stock,
+              check_date
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_DATE)
+        """, (
+            row['product_name'],
+            row['group_name'],
+            row['db_stock'],
+            row['in_shelf_count'],
+            row['unit_count'],
+            row['pos_stock'],
+            row['actual'],
+            row['diff']
+        ))
 
-        for i in range(len(data['product_name'])):
-            cur.execute("""
-                INSERT INTO tobacco_inventory_check
-                (product_name, group_name, db_stock, in_shelf, unit_count)
-                VALUES (%s,%s,%s,%s,%s)
-            """, (
-                data['product_name'][i],
-                data['group_name'][i],
-                data['db_stock'][i],
-                data['in_shelf'][i],
-                data['unit_count'][i]
-            ))
+    conn.commit()
+    return jsonify({"status": "ok"})
 
-        conn.commit()
-        cur.close()
-        conn.close()
-        return redirect(url_for('tobacco_result'))
+-----------------------------
+棚卸入力 → 一時保存
+-----------------------------
+@app.route('/tobacco_check/confirm', methods=['POST'])
+def tobacco_check_confirm():
+    data = request.get_json()
 
-    cur.execute("""
-        SELECT
-            p.product_name,
-            p.group_name,
-            COALESCE(SUM(i.received_quantity),0)
-          - COALESCE(SUM(o.shipped_quantity),0) AS db_stock
-        FROM products p
-        LEFT JOIN inventory_in i ON p.product_name = i.product_name
-        LEFT JOIN inventory_out o ON p.product_name = o.product_name
-        WHERE p.category_name = 'たばこ'
-        GROUP BY p.product_name, p.group_name
-        ORDER BY p.group_name, p.product_name
-    """)
+    if not data:
+        return jsonify({"status": "error", "message": "no data"}), 400
 
-    products = cur.fetchall()
-    cur.close()
-    conn.close()
+    # セッションに一時保存（まだDBには入れない）
+    session['tobacco_temp'] = data
 
-    return render_template('tobacco_check.html', products=products)
+    return jsonify({"status": "ok"})
+# @app.route('/tobacco_check/confirm', methods=['POST'])
+# def tobacco_check_confirm():
+#     print("CONFIRM HIT")
+#     return jsonify({"status": "ok"})
 
 
 # -----------------------------
@@ -550,7 +557,7 @@ def tobacco_result():
         SELECT
             g.group_name,
             SUM(
-                COALESCE(tic.db_stock,0)
+                COALESCE(tic.db_stock,0) 
             + COALESCE(tic.in_shelf_count,0)
             + COALESCE(tic.unit_count,0)
             )AS actual_stock

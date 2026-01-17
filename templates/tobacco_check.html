@@ -6,8 +6,7 @@
 
 <h2>たばこ棚卸入力</h2>
 
-<form method="post">
-<table border="1">
+<table border="1" id="tobaccoTable">
 <tr>
     <th>銘柄</th>
     <th>DB在庫</th>
@@ -20,20 +19,65 @@
     <td>{{ p[0] }}</td>
     <td>{{ p[2] }}</td>
 
-    <input type="hidden" name="product_name" value="{{ p[0] }}">
-    <input type="hidden" name="group_name" value="{{ p[1] }}">
-    <input type="hidden" name="db_stock" value="{{ p[2] }}">
+    <input type="hidden" class="product_name" value="{{ p[0] }}">
+    <input type="hidden" class="group_name" value="{{ p[1] }}">
+    <input type="hidden" class="db_stock" value="{{ p[2] }}">
 
-    <td><input type="number" name="in_shelf" value="0"></td>
-    <td><input type="number" name="unit_count" value="0"></td>
+    <td><input type="number" class="in_shelf" value="0"></td>
+    <td><input type="number" class="unit_count" value="0"></td>
 </tr>
 {% endfor %}
 </table>
 
 <br>
-<a href="tobacco_result">次へ</a>
-</form>
+<button type="button" id="confirmBtn">次へ</button>
 
+<script>
+document.getElementById("confirmBtn").addEventListener("click", () => {
 
+  const rows = document.querySelectorAll("#tobaccoTable tr");
+  const finalData = [];
 
+  rows.forEach((row, index) => {
+    if (index === 0) return;
+
+    finalData.push({
+      product_name: row.querySelector(".product_name").value,
+      group_name: row.querySelector(".group_name").value,
+      db_stock: Number(row.querySelector(".db_stock").value),
+      in_shelf_count: Number(row.querySelector(".in_shelf").value),
+      unit_count: Number(row.querySelector(".unit_count").value)
+    });
+  });
+
+  fetch("/tobacco_check/confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(finalData)
+  })
+  .then(res => res.json())
+  .then(() => {
+    window.location.href = "/tobacco_result";
+  })
+  .catch(err => {
+    alert("エラーが発生しました");
+    console.error(err);
+  });
+});
+</script>
+
+<script>
+document.getElementById("confirmBtn").addEventListener("click", () => {
+  fetch("/tobacco_check/confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ test: "ok" })
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert("通信成功");
+    console.log(data);
+  });
+});
+</script>
 {% endblock %}
