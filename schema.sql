@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS tobacco_inventory_check (
     group_name VARCHAR(16) NOT NULL
         REFERENCES group_by_counts(group_name),
 
-    check_date DATE NOT NULL,
+    check_date DATE NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     in_shelf_count INTEGER NOT NULL,
     unit_count INTEGER NOT NULL,

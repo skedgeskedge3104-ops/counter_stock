@@ -489,90 +489,81 @@ def counter_stock():
     return render_template('counter_stock.html', items = items)
 
 
------------------------------
-棚卸入力画面
------------------------------
-@app.route('/tobacco_check/confirm', methods=['POST'])
-def tobacco_check_confirm():
+# -----------------------------
+# 棚卸入力画面
+# -----------------------------
+# 1. 入力画面の表示（DBから全銘柄を取得して渡す）
+@app.route('/tobacco_check')
+def tobacco_check():
     conn = get_db_connection()
     cur = conn.cursor()
-    data = request.json
-
-    for row in data:
-        cur.execute("""
-            INSERT INTO tobacco_inventory_check (
-              product_name,
-              group_name,
-              db_stock,
-              in_shelf_count,
-              unit_count,
-              pos_stock,
-              actual_stock,
-              diff_stock,
-              check_date
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_DATE)
-        """, (
-            row['product_name'],
-            row['group_name'],
-            row['db_stock'],
-            row['in_shelf_count'],
-            row['unit_count'],
-            row['pos_stock'],
-            row['actual'],
-            row['diff']
-        ))
-
-    conn.commit()
-    return jsonify({"status": "ok"})
-
------------------------------
-棚卸入力 → 一時保存
------------------------------
-@app.route('/tobacco_check/confirm', methods=['POST'])
-def tobacco_check_confirm():
-    data = request.get_json()
-
-    if not data:
-        return jsonify({"status": "error", "message": "no data"}), 400
-
-    # セッションに一時保存（まだDBには入れない）
-    session['tobacco_temp'] = data
-
-    return jsonify({"status": "ok"})
-# @app.route('/tobacco_check/confirm', methods=['POST'])
-# def tobacco_check_confirm():
-#     print("CONFIRM HIT")
-#     return jsonify({"status": "ok"})
-
-
-# -----------------------------
-# 棚卸結果表示
-# -----------------------------
-@app.route('/tobacco_result')
-def tobacco_result():
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT
-            g.group_name,
-            SUM(
-                COALESCE(tic.db_stock,0) 
-            + COALESCE(tic.in_shelf_count,0)
-            + COALESCE(tic.unit_count,0)
-            )AS actual_stock
-        FROM group_by_counts g
-        JOIN tobacco_inventory_check tic
-            ON g.group_name = tic.group_name
-        GROUP BY g.group_name
-        ORDER BY g.group_name;
-    """)
-
-    results = cur.fetchall()
+    # 銘柄名、グループ名、DB在庫（仮）を取得
+    cur.execute(""" SELECT p.product_name, p.group_name, (COALESCE(SUM(i.received_quantity),0) - COALESCE(SUM(o.shipped_quantity),0))*10 AS db_stock FROM products p LEFT JOIN inventory_in i ON p.product_name = i.product_name LEFT JOIN inventory_out o ON p.product_name = o.product_name WHERE p.category_name = 'たばこ' GROUP BY p.product_name, p.group_name ORDER BY p.group_name, p.product_name """)
+    products = cur.fetchall()
     cur.close()
     conn.close()
+    return render_template('tobacco_check.html', products=products)
 
+# 2. 一時保存（セッションへ）
+@app.route('/tobacco_check/confirm', methods=['POST'])
+def tobacco_check_confirm():
+    data = request.json
+    if not data:
+        return jsonify({"status": "error"}), 400
+    session['tobacco_temp'] = data # 銘柄ごとの入力値をそのままセッションへ
+    return jsonify({"status": "ok"})
+
+# 3. 集計画面の表示（セッションデータをグループ合計して表示）
+@app.route('/tobacco_result')
+def tobacco_result():
+    temp_data = session.get('tobacco_temp', [])
+    
+    # グループ（価格）単位で集計
+    summary = {} 
+    for item in temp_data:
+        g_name = item['group_name']
+        actual = item['in_shelf_count'] + item['unit_count']
+        
+        if g_name not in summary:
+            summary[g_name] = 0
+        summary[g_name] += actual
+
+    # テンプレート用にリスト化 [ [グループ名, 実地合計], ... ]
+    results = [[name, total] for name, total in summary.items()]
     return render_template('tobacco_result.html', results=results)
+
+# 4. 最終保存（DBへINSERT）
+@app.route('/tobacco_check/final_save', methods=['POST'])
+def tobacco_final_save():
+    temp_data = session.get('tobacco_temp', [])
+    pos_dict = request.json # { "600円": 100, ... }
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        for row in temp_data:
+            g_name = row['group_name']
+            # この銘柄が属するグループのPOS在庫を取得
+            group_pos = pos_dict.get(g_name, 0)
+            
+            cur.execute("""
+                INSERT INTO tobacco_inventory_check (
+                    product_name, group_name, in_shelf_count, 
+                    unit_count, pos_stock, check_date
+                ) VALUES (%s, %s, %s, %s, %s, CURRENT_DATE)
+            """, (
+                row['product_name'], row['group_name'], 
+                row['in_shelf_count'], row['unit_count'], group_pos
+            ))
+        conn.commit()
+        session.pop('tobacco_temp', None)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 
 
