@@ -497,7 +497,23 @@ def tobacco_check():
     conn = get_db_connection()
     cur = conn.cursor()
     # 銘柄名、グループ名、DB在庫（仮）を取得
-    cur.execute(""" SELECT p.product_name, p.group_name, (COALESCE(SUM(i.received_quantity),0) - COALESCE(SUM(o.shipped_quantity),0))*10 AS db_stock FROM products p LEFT JOIN inventory_in i ON p.product_name = i.product_name LEFT JOIN inventory_out o ON p.product_name = o.product_name WHERE p.category_name = 'たばこ' GROUP BY p.product_name, p.group_name ORDER BY p.group_name, p.product_name """)
+    cur.execute(""" SELECT 
+    p.product_name, 
+    p.group_name,
+    (COALESCE(i.total_in, 0) - COALESCE(o.total_out, 0)) * p.quantity_box AS db_stock
+FROM products p
+LEFT JOIN (
+    -- 先に入庫だけを合計する
+    SELECT product_name, group_name, SUM(received_quantity) as total_in 
+    FROM inventory_in GROUP BY product_name, group_name
+) i ON p.product_name = i.product_name AND p.group_name = i.group_name
+LEFT JOIN (
+    -- 先に出庫だけを合計する
+    SELECT product_name, group_name, SUM(shipped_quantity) as total_out 
+    FROM inventory_out GROUP BY product_name, group_name
+) o ON p.product_name = o.product_name AND p.group_name = o.group_name
+WHERE p.category_name = 'たばこ'
+ORDER BY p.group_name, p.product_name; """)
     products = cur.fetchall()
     cur.close()
     conn.close()
