@@ -535,17 +535,25 @@ def tobacco_result():
     
     # グループ（価格）単位で集計
     summary = {} 
+    
     for item in temp_data:
         g_name = item['group_name']
-        actual = item['in_shelf_count'] + item['unit_count']
         
+        # 各数値を安全に取得
+        in_shelf = item.get('in_shelf_count', 0)
+        unit = item.get('unit_count', 0)
+        db_stock = item.get('db_stock', 0)
+        
+        # ご要望の計算式：(棚 + バラ + DB在庫)
+        actual_total = in_shelf + unit + db_stock
+        
+        # グループごとに加算
         if g_name not in summary:
             summary[g_name] = 0
-        summary[g_name] += actual
+        summary[g_name] += actual_total
 
-    # テンプレート用にリスト化 [ [グループ名, 実地合計], ... ]
-    results = [[name, total] for name, total in summary.items()]
-    return render_template('tobacco_result.html', results=results)
+    # 集計結果を表示用のテンプレートへ送る
+    return render_template('tobacco_result.html', summary=summary)
 
 # 4. 最終保存（DBへINSERT）
 @app.route('/tobacco_check/final_save', methods=['POST'])
