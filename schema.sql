@@ -7,9 +7,7 @@ CREATE TABLE  IF NOT EXISTS group_by_counts (
     group_no SERIAL,
     group_name VARCHAR(16) PRIMARY KEY,
     values NUMERIC(5,2),
-    category_name VARCHAR(16) NOT NULL
-        REFERENCES categories(category_name)
-);
+   );
 
 CREATE TABLE  IF NOT EXISTS shops (
     shop_id SERIAL PRIMARY KEY,

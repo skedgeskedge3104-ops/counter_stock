@@ -199,7 +199,6 @@ def register_product():
         group_names = []
         category_names = []
         shop_names = []
-        provisional_names = []
         conn = None
         
         try:
