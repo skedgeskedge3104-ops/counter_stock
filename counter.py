@@ -533,27 +533,27 @@ def tobacco_check_confirm():
 def tobacco_result():
     temp_data = session.get('tobacco_temp', [])
     
-    # グループ（価格）単位で集計
-    summary = {} 
+    # グループ単位で集計するための辞書
+    summary_dict = {} 
     
     for item in temp_data:
         g_name = item['group_name']
+        # 前回の要望通り：棚 + バラ + DB在庫 を合算
+        actual_val = (
+            int(item.get('in_shelf_count', 0)) + 
+            int(item.get('unit_count', 0)) + 
+            int(item.get('db_stock', 0))
+        )
         
-        # 各数値を安全に取得
-        in_shelf = item.get('in_shelf_count', 0)
-        unit = item.get('unit_count', 0)
-        db_stock = item.get('db_stock', 0)
-        
-        # ご要望の計算式：(棚 + バラ + DB在庫)
-        actual_total = in_shelf + unit + db_stock
-        
-        # グループごとに加算
-        if g_name not in summary:
-            summary[g_name] = 0
-        summary[g_name] += actual_total
+        if g_name not in summary_dict:
+            summary_dict[g_name] = 0
+        summary_dict[g_name] += actual_val
 
-    # 集計結果を表示用のテンプレートへ送る
-    return render_template('tobacco_result.html', summary=summary)
+    # HTMLの {% for r in results %} で r[0], r[1] と呼んでいるので形式を合わせる
+    # 例: [['580円', 120], ['600円', 85]]
+    results = [[group, total] for group, total in summary_dict.items()]
+
+    return render_template('tobacco_result.html', results=results)
 
 # 4. 最終保存（DBへINSERT）
 @app.route('/tobacco_check/final_save', methods=['POST'])
