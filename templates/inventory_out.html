@@ -44,10 +44,10 @@
         <tbody>
             {% for item in inventory_out %}
             <tr>
-                <td>{{ item[1] }}</td>
-                <td>{{ item[4] }}</td>
                 <td>{{ item[2] }}</td>
-                <td>{{ item[3].strftime('%y,%m,%d')  }}</td>
+                <td>{{ item[1] }}</td>
+                <td>{{ item[3] }}</td>
+                <td>{{ item[4].strftime('%y,%m,%d')  }}</td>
 
                 <td>
                     <form action="{{url_for('edit_out',out_id=item[0])}}" style="display: block;">

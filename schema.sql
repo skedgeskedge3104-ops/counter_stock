@@ -9,6 +9,8 @@ CREATE TABLE  IF NOT EXISTS group_by_counts (
     values NUMERIC(5,2),
    );
 
+ALTER TABLE group_by_counts ALTER COLUMN values TYPE NUMERIC(6,2);
+
 CREATE TABLE  IF NOT EXISTS shops (
     shop_id SERIAL PRIMARY KEY,
     shop_name VARCHAR(16) UNIQUE NOT NULL
@@ -30,9 +32,15 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 
+
+
 ALTER TABLE products
 ADD CONSTRAINT products_product_group_unique
 UNIQUE (product_name, group_name);
+
+ALTER TABLE products ADD COLUMN category_name VARCHAR(16) REFERENCES categories(category_name);
+
+ALTER TABLE products ALTER COLUMN unit_price TYPE NUMERIC (6,2);
 
 CREATE TABLE IF NOT EXISTS inventory_in (
     in_id SERIAL PRIMARY KEY,
