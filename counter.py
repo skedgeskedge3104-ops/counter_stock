@@ -513,7 +513,7 @@ LEFT JOIN (
     FROM inventory_out GROUP BY product_name, group_name
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
 WHERE p.category_name = 'たばこ'
-ORDER BY p.group_name, p.product_name; """)
+ORDER BY p.product_no; """)
     products = cur.fetchall()
     cur.close()
     conn.close()
