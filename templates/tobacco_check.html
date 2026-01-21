@@ -14,17 +14,17 @@
         <th>unit_count (バラ)</th>
     </tr>
 
-    {% for p in products %}
+   {% for p in products %}
     <tr>
         <td>
-            {{ p[0] }}
-            <input type="hidden" class="product_name" value="{{ p[0] }}">
-            <input type="hidden" class="group_name" value="{{ p[1] }}">
-            <input type="hidden" class="db_stock" value="{{ p[2] }}">
+            {{ p.product_name }}
+            <input type="hidden" class="product_name" value="{{ p.product_name }}">
+            <input type="hidden" class="group_name" value="{{ p.group_name }}">
+            <input type="hidden" class="db_stock" value="{{ p.db_stock }}">
         </td>
-        <td>{{ p[2] }}</td>
-        <td><input type="number" class="in_shelf" value="0" min="0"></td>
-        <td><input type="number" class="unit_count" value="0" min="0"></td>
+        <td>{{ p.db_stock }}</td>
+        <td><input type="number" class="in_shelf" value="{{ p.in_shelf_count }}" min="0"></td>
+        <td><input type="number" class="unit_count" value="{{ p.unit_count }}" min="0"></td>
     </tr>
     {% endfor %}
 </table>

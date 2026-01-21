@@ -496,8 +496,8 @@ def counter_stock():
 def tobacco_check():
     conn = get_db_connection()
     cur = conn.cursor()
-    # 銘柄名、グループ名、DB在庫（仮）を取得
-    cur.execute(""" SELECT 
+    # 1. 最新の商品情報をDBから取得
+    cur.execute("""SELECT 
     p.product_name, 
     p.group_name,
     (COALESCE(i.total_in, 0) - COALESCE(o.total_out, 0)) * p.quantity_box AS db_stock
@@ -514,10 +514,33 @@ LEFT JOIN (
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
 WHERE p.category_name = 'たばこ'
 ORDER BY p.product_no; """)
-    products = cur.fetchall()
+    db_products = cur.fetchall()
     cur.close()
     conn.close()
-    return render_template('tobacco_check.html', products=products)
+
+    # 2. セッションに一時保存データがあるか確認
+    temp_data = session.get('tobacco_temp', [])
+    
+    # 3. セッションデータを検索しやすいように辞書形式に変換 { "銘柄名": {データ}, ... }
+    temp_dict = {item['product_name']: item for item in temp_data}
+
+    # 4. DBの商品リストに、セッションの入力値をマージ（合体）させる
+    products_with_values = []
+    for p in db_products:
+        name = p[0]
+        # セッションに入力値があればそれを使い、なければ 0 を入れる
+        in_shelf = temp_dict.get(name, {}).get('in_shelf_count', 0)
+        unit_count = temp_dict.get(name, {}).get('unit_count', 0)
+        
+        products_with_values.append({
+            'product_name': p[0],
+            'group_name': p[1],
+            'db_stock': p[2],
+            'in_shelf_count': in_shelf,
+            'unit_count': unit_count
+        })
+
+    return render_template('tobacco_check.html', products=products_with_values)
 
 # 2. 一時保存（セッションへ）
 @app.route('/tobacco_check/confirm', methods=['POST'])
