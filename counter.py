@@ -559,14 +559,13 @@ def tobacco_result():
 @app.route('/tobacco_check/final_save', methods=['POST'])
 def tobacco_final_save():
     temp_data = session.get('tobacco_temp', [])
-    pos_dict = request.json # { "600円": 100, ... }
+    pos_dict = request.json
     
     conn = get_db_connection()
     cur = conn.cursor()
     try:
         for row in temp_data:
             g_name = row['group_name']
-            # この銘柄が属するグループのPOS在庫を取得
             group_pos = pos_dict.get(g_name, 0)
             
             cur.execute("""
@@ -578,16 +577,19 @@ def tobacco_final_save():
                 row['product_name'], row['group_name'], 
                 row['in_shelf_count'], row['unit_count'], group_pos
             ))
+        
         conn.commit()
-        session.pop('tobacco_temp', None)
+        session.pop('tobacco_temp', None) # セッションを消去
+        
+        # 【重要】成功したことをJSONで伝える
         return jsonify({"status": "ok"})
+        
     except Exception as e:
         conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         cur.close()
         conn.close()
-
 
 
 
