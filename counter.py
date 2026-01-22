@@ -461,8 +461,11 @@ def get_product_names(group_name):
     conn.close()    
     
     return jsonify(product_names)
-    
 
+
+# -----------------------------
+# 在庫確認画面
+# -----------------------------   
 
 @app.route('/counter_stock')
 def counter_stock():
@@ -472,7 +475,16 @@ def counter_stock():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute('SELECT * FROM products;')
+        cur.execute('''SELECT c.category_name, p.product_name, COALESCE(SUM(i_in.received_quantity,0)) - COALESCE(SUM(shipped_quantity,0)) AS 在庫数
+                    FROM group_by_counts AS g LEFT JOIN products AS p ON g.group_name = p.grouo_name 
+                    LEFT JOIN invenoty_out AS i_out ON p.product_name = i_out.product_name
+                    LEFT JOIN inventory_in AS i_in ON p.product_name = i_in.product_name
+                    LEFT JOIN categories AS c ON c.category_name = p.category_name
+                    WHERE category_name = 'お菓子' 
+                    GROUP BY c.category_name, p.product_name, g.group_name
+                    HAVING COALESCE(SUM(i_in.received_quantity,0)) - COALESCE(SUM(shipped_quantity,0)) != 0
+                    ORDER BY g.group_name;
+                    ''')
         
         items = cur.fetchall()
         
