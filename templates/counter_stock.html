@@ -4,26 +4,98 @@
 
 {% block content %}
 
-<h2>お菓子在庫</h2>
 
-<table>
+<head>
+    
+    <title>在庫確認</title>
+    <style>
+        /* 簡単なスタイル調整 */
+        .category-buttons { margin-bottom: 20px; }
+        button { padding: 10px 20px; cursor: pointer; margin-right: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; text-align: left; border: 1px solid #ccc; }
+        th { background-color: #f4f4f4; }
+        .stock-val { text-align: right; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<h2>在庫確認一覧</h2>
+
+<div class="category-buttons">
+    <button onclick="loadStock('お菓子')">お菓子</button>
+    <button onclick="loadStock('ドリンク')">ドリンク</button>
+    <button onclick="loadStock('たばこ')">たばこ</button>
+</div>
+
+<h3 id="currentCategoryTitle">表示中: お菓子</h3>
+
+<table border="1">
     <thead>
         <tr>
-            <th>玉数</th>
-            <th>商品名</th>
+            <th>グループ</th>
+            <th>銘柄</th>
             <th>在庫数</th>
         </tr>
     </thead>
-    <tbody>
-        {% for item in items %}
-        <tr>
-            <td>{{ item[1] }}</td>
-            <td>{{ item[2] }}</td>
-            <td>{{ item[3] }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
+    <tbody id="stockTableBody">
+        </tbody>
 </table>
+
+<p><a href="/">メニューに戻る</a></p>
+
+
+
+<script>
+/**
+ * 指定したカテゴリーの在庫を非同期で取得して表示
+ */
+function loadStock(category) {
+    const tbody = document.getElementById('stockTableBody');
+    const title = document.getElementById('currentCategoryTitle');
+    
+    // タイトルの更新
+    title.textContent = `表示中: ${category}`;
+    // 読み込み中の表示
+    tbody.innerHTML = '<tr><td colspan="3">読み込み中...</td></tr>';
+
+    // サーバーのAPIを叩く
+    fetch(`/api/get_stock/${encodeURIComponent(category)}`)
+        .then(res => {
+            if (!res.ok) throw new Error('ネットワークエラー');
+            return res.json();
+        })
+        .then(data => {
+            tbody.innerHTML = ''; // クリア
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3">在庫のある商品はありません</td></tr>';
+                return;
+            }
+
+            // 取得したデータをループしてテーブルを作成
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.group}</td>
+                    <td>${item.name}</td>
+                    <td class="stock-val">${item.stock}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        })
+        .catch(err => {
+            console.error(err);
+            tbody.innerHTML = '<tr><td colspan="3" style="color:red;">データの取得に失敗しました</td></tr>';
+        });
+}
+
+// ページを開いた時に初期表示として「お菓子」を読み込む
+window.onload = () => loadStock('お菓子');
+</script>
+
+</body>
+
 
 <a style="display: block;" href="/">メニューに戻る</a>
 

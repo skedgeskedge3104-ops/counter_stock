@@ -469,7 +469,10 @@ def get_product_names(group_name):
 
 @app.route('/counter_stock')
 def counter_stock():
-    # 1. 最初に変数を初期化（エラーが起きてもreturnで落ちないようにするため）
+    return render_template('counter_stock.html')
+
+@app.route('/api/get_stock/<category>')
+def api_get_stock(category):
     items = []
     conn = None
     cur = None
@@ -478,8 +481,8 @@ def counter_stock():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # 2. SQLの修正
-        # 入庫合計と出庫合計をそれぞれ「サブクエリ」で計算してから、商品マスターにぶつけます
+        # サブクエリを使って入出庫を個別に集計し、計算の重複（デカルト積）を防止
+        # ユーザー様のご指摘通り c.category_name を使用
         cur.execute('''
             SELECT 
                 c.category_name, 
@@ -490,34 +493,48 @@ def counter_stock():
             JOIN categories AS c ON p.category_name = c.category_name
             JOIN group_by_counts AS g ON p.group_name = g.group_name
             
+            -- 入庫の合計
             LEFT JOIN (
                 SELECT product_name, SUM(received_quantity) AS total_in
                 FROM inventory_in
                 GROUP BY product_name
             ) AS in_sums ON p.product_name = in_sums.product_name
             
+            -- 出庫の合計
             LEFT JOIN (
                 SELECT product_name, SUM(shipped_quantity) AS total_out
                 FROM inventory_out
                 GROUP BY product_name
             ) AS out_sums ON p.product_name = out_sums.product_name
             
-            WHERE c.category_name = 'お菓子' 
+            -- 指定されたカテゴリで絞り込み
+            WHERE c.category_name = %s
             AND (COALESCE(in_sums.total_in, 0) - COALESCE(out_sums.total_out, 0)) != 0
-            ORDER BY g.group_name, p.product_name;
-        ''')
+            ORDER BY g.group_no;
+        ''', (category,))
         
-        items = cur.fetchall()
+        rows = cur.fetchall()
         
-    except Exception as e:
+        # JavaScriptで扱いやすいように辞書形式のリストに変換
+        items = [
+            {
+                "category": r[0],
+                "group": r[1],
+                "name": r[2],
+                "stock": float(r[3]) # Decimal型をfloatに変換してJSON化可能にする
+            } for r in rows
+        ]
+        
+        return jsonify(items)
 
-        print(f'Database Error: {e}')
+    except Exception as e:
+        print(f"API Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
         
     finally:
         if cur: cur.close()
         if conn: conn.close()
-            
-    return render_template('counter_stock.html', items=items)
+
 
 
 # -----------------------------
