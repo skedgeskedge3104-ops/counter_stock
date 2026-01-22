@@ -469,35 +469,55 @@ def get_product_names(group_name):
 
 @app.route('/counter_stock')
 def counter_stock():
+    # 1. 最初に変数を初期化（エラーが起きてもreturnで落ちないようにするため）
+    items = []
     conn = None
     cur = None
     
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute('''SELECT c.category_name, g.group_name, p.product_name, COALESCE(SUM(i_in.received_quantity,0)) - COALESCE(SUM(shipped_quantity,0)) AS 在庫数
-                    FROM group_by_counts AS g LEFT JOIN products AS p ON g.group_name = p.grouo_name 
-                    LEFT JOIN invenoty_out AS i_out ON p.product_name = i_out.product_name
-                    LEFT JOIN inventory_in AS i_in ON p.product_name = i_in.product_name
-                    LEFT JOIN categories AS c ON c.category_name = p.category_name
-                    WHERE category_name = 'お菓子' 
-                    GROUP BY c.category_name, p.product_name, g.group_name
-                    HAVING COALESCE(SUM(i_in.received_quantity,0)) - COALESCE(SUM(shipped_quantity,0)) != 0
-                    ORDER BY g.group_name;
-                    ''')
+        
+        # 2. SQLの修正
+        # 入庫合計と出庫合計をそれぞれ「サブクエリ」で計算してから、商品マスターにぶつけます
+        cur.execute('''
+            SELECT 
+                c.category_name, 
+                g.group_name, 
+                p.product_name,
+                (COALESCE(in_sums.total_in, 0) - COALESCE(out_sums.total_out, 0)) AS stock_count
+            FROM products AS p
+            JOIN categories AS c ON p.category_name = c.category_name
+            JOIN group_by_counts AS g ON p.group_name = g.group_name
+            
+            LEFT JOIN (
+                SELECT product_name, SUM(received_quantity) AS total_in
+                FROM inventory_in
+                GROUP BY product_name
+            ) AS in_sums ON p.product_name = in_sums.product_name
+            
+            LEFT JOIN (
+                SELECT product_name, SUM(shipped_quantity) AS total_out
+                FROM inventory_out
+                GROUP BY product_name
+            ) AS out_sums ON p.product_name = out_sums.product_name
+            
+            WHERE c.category_name = 'お菓子' 
+            AND (COALESCE(in_sums.total_in, 0) - COALESCE(out_sums.total_out, 0)) != 0
+            ORDER BY g.group_name, p.product_name;
+        ''')
         
         items = cur.fetchall()
         
     except Exception as e:
-        print(f'error:{e}')
+
+        print(f'Database Error: {e}')
         
     finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
+        if cur: cur.close()
+        if conn: conn.close()
             
-    return render_template('counter_stock.html', items = items)
+    return render_template('counter_stock.html', items=items)
 
 
 # -----------------------------
