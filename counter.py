@@ -475,7 +475,7 @@ def counter_stock():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute('''SELECT c.category_name, p.product_name, COALESCE(SUM(i_in.received_quantity,0)) - COALESCE(SUM(shipped_quantity,0)) AS 在庫数
+        cur.execute('''SELECT c.category_name, g.group_name, p.product_name, COALESCE(SUM(i_in.received_quantity,0)) - COALESCE(SUM(shipped_quantity,0)) AS 在庫数
                     FROM group_by_counts AS g LEFT JOIN products AS p ON g.group_name = p.grouo_name 
                     LEFT JOIN invenoty_out AS i_out ON p.product_name = i_out.product_name
                     LEFT JOIN inventory_in AS i_in ON p.product_name = i_in.product_name
