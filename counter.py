@@ -292,7 +292,7 @@ def inventory_in():
         cur.execute("SELECT * FROM inventory_in WHERE DATE(received_day) = DATE(timezone('Asia/Tokyo',now())); ")
         inventory_in = cur.fetchall()
         
-        cur.execute("SELECT group_name, SUM(received_quantity) AS 入庫合計 FROM inventory_in WHERE DATE(received_day)=DATE(TIMEZONE('Asia/Tokyo',Now())) GROUP BY received_quantity,group_name; ")
+        cur.execute("SELECT p.group_name, SUM(i_in.received_quantity)*p.quantity_box AS 入庫合計 FROM inventory_in AS i_in LEFT JOIN products AS p ON p.product_name = i_in.product_name WHERE DATE(i_in.received_day)=DATE(TIMEZONE('Asia/Tokyo',Now())) GROUP BY i_in.received_quantity,p.group_name, p.quantity_box; ")
         total_in = cur.fetchall()
         
         cur.close()
