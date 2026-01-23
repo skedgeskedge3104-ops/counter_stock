@@ -335,7 +335,7 @@ def inventory_in():
     
         return redirect(url_for('inventory_in'))
         
-    return render_template('inventory_in.html', group_names = group_names, product_names = product_names, inventory_in = inventory_in)
+    return render_template('inventory_in.html', group_names = group_names, product_names = product_names, inventory_in = inventory_in , total_in=total_in)
 
 @app.route('/import', methods=['GET','POST'])
 def import_csv():
