@@ -6,6 +6,11 @@ import csv
 import datetime
 import pytz
 
+
+# -----------------------------
+# 初期設定
+# -----------------------------
+
 app=Flask(__name__)
 app.secret_key = "super-secret-key"
 
@@ -72,6 +77,10 @@ def get_db_connection():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+# -----------------------------
+# 登録関係
+# -----------------------------
 
 @app.route('/register')
 def register():
@@ -259,7 +268,11 @@ def register_product():
             return f'error:{e}'
         
     return render_template('register_product.html')
-            
+
+
+# -----------------------------
+# 入庫
+# -----------------------------            
 
 @app.route('/inventory_in', methods = ('GET','POST'))
 def inventory_in():
@@ -277,8 +290,10 @@ def inventory_in():
         product_names = [row[0] for row in cur.fetchall()]
         
         cur.execute("SELECT * FROM inventory_in WHERE DATE(received_day) = DATE(timezone('Asia/Tokyo',now())); ")
-        
         inventory_in = cur.fetchall()
+        
+        cur.execute('SELECT group_name, SUM(received_quantity) AS 入庫合計 FROM inventory_in WHERE DATE(received_day)=DATE(TIMEZONE('Asia/Tokyo',Now())) GROUP BY received_quantity,group_name; ')
+        total_in = cur.fetchall()
         
         cur.close()
         
@@ -368,7 +383,9 @@ def import_csv():
     
     return render_template('import.html')
 
-
+# -----------------------------
+# 出庫
+# -----------------------------
 
 @app.route('/inventory_out', methods=['GET','POST'])
 def inventory_out():
@@ -480,9 +497,7 @@ def api_get_stock(category):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        
-        # サブクエリを使って入出庫を個別に集計し、計算の重複（デカルト積）を防止
-        # ユーザー様のご指摘通り c.category_name を使用
+    
         cur.execute('''
             SELECT 
                 c.category_name, 
@@ -515,13 +530,12 @@ def api_get_stock(category):
         
         rows = cur.fetchall()
         
-        # JavaScriptで扱いやすいように辞書形式のリストに変換
         items = [
             {
                 "category": r[0],
                 "group": r[1],
                 "name": r[2],
-                "stock": float(r[3]) # Decimal型をfloatに変換してJSON化可能にする
+                "stock": float(r[3]) 
             } for r in rows
         ]
         
@@ -540,12 +554,12 @@ def api_get_stock(category):
 # -----------------------------
 # 棚卸入力画面
 # -----------------------------
-# 1. 入力画面の表示（DBから全銘柄を取得して渡す）
+
 @app.route('/tobacco_check')
 def tobacco_check():
     conn = get_db_connection()
     cur = conn.cursor()
-    # 1. 最新の商品情報をDBから取得
+
     cur.execute("""SELECT 
     p.product_name, 
     p.group_name,
@@ -567,17 +581,14 @@ ORDER BY p.product_no; """)
     cur.close()
     conn.close()
 
-    # 2. セッションに一時保存データがあるか確認
     temp_data = session.get('tobacco_temp', [])
     
-    # 3. セッションデータを検索しやすいように辞書形式に変換 { "銘柄名": {データ}, ... }
     temp_dict = {item['product_name']: item for item in temp_data}
 
-    # 4. DBの商品リストに、セッションの入力値をマージ（合体）させる
     products_with_values = []
     for p in db_products:
         name = p[0]
-        # セッションに入力値があればそれを使い、なければ 0 を入れる
+        
         in_shelf = temp_dict.get(name, {}).get('in_shelf_count', 0)
         unit_count = temp_dict.get(name, {}).get('unit_count', 0)
         
@@ -591,26 +602,25 @@ ORDER BY p.product_no; """)
 
     return render_template('tobacco_check.html', products=products_with_values)
 
-# 2. 一時保存（セッションへ）
 @app.route('/tobacco_check/confirm', methods=['POST'])
 def tobacco_check_confirm():
     data = request.json
     if not data:
         return jsonify({"status": "error"}), 400
-    session['tobacco_temp'] = data # 銘柄ごとの入力値をそのままセッションへ
+    session['tobacco_temp'] = data 
     return jsonify({"status": "ok"})
 
-# 3. 集計画面の表示（セッションデータをグループ合計して表示）
+
 @app.route('/tobacco_result')
 def tobacco_result():
     temp_data = session.get('tobacco_temp', [])
     
-    # グループ単位で集計するための辞書
+
     summary_dict = {} 
     
     for item in temp_data:
         g_name = item['group_name']
-        # 前回の要望通り：棚 + バラ + DB在庫 を合算
+
         actual_val = (
             int(item.get('in_shelf_count', 0)) + 
             int(item.get('unit_count', 0)) + 
@@ -621,13 +631,10 @@ def tobacco_result():
             summary_dict[g_name] = 0
         summary_dict[g_name] += actual_val
 
-    # HTMLの {% for r in results %} で r[0], r[1] と呼んでいるので形式を合わせる
-    # 例: [['580円', 120], ['600円', 85]]
     results = [[group, total] for group, total in summary_dict.items()]
 
     return render_template('tobacco_result.html', results=results)
 
-# 4. 最終保存（DBへINSERT）
 @app.route('/tobacco_check/final_save', methods=['POST'])
 def tobacco_final_save():
     temp_data = session.get('tobacco_temp', [])
@@ -651,9 +658,8 @@ def tobacco_final_save():
             ))
         
         conn.commit()
-        session.pop('tobacco_temp', None) # セッションを消去
+        session.pop('tobacco_temp', None) 
         
-        # 【重要】成功したことをJSONで伝える
         return jsonify({"status": "ok"})
         
     except Exception as e:
