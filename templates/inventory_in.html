@@ -29,8 +29,7 @@
         
             <button type="submit">登録</button>
         </form>
-        <br><br><br>
-
+        <br>
         <a href="import">ｃｓｖから入庫する</a><br>
         <a href="/">メインメニューに戻る</a>
     </div>
@@ -51,6 +50,23 @@
                 <td>{{ item[1] }}</td>
                 <td>{{ item[3] }}</td>
                 <td>{{ item[4].strftime('%y,%m,%d')  }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table style="width: 90%;  text-align: center; margin: 50px auto;" >
+        <thead>
+            <tr>
+                <th>玉数名</th>
+                <th>入庫合計</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for in in total_in %}
+            <tr>
+                <td>{{ in[0] }}</td>
+                <td>{{ in[1] }}</td>
             </tr>
             {% endfor %}
         </tbody>
