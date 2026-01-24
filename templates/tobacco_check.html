@@ -23,8 +23,12 @@
             <input type="hidden" class="db_stock" value="{{ p.db_stock }}">
         </td>
         <td>{{ p.db_stock }}</td>
-        <td><input type="number" class="in_shelf" value="{{ p.in_shelf_count }}" placeholder="0"></td>
-        <td><input type="number" class="unit_count" value="{{ p.unit_count }}" placeholder="0"></td>
+        <td><input type="number" class="in_shelf" value="{{ p.in_shelf_count }}" value="0" 
+           onfocus="if(this.value=='0')this.value='';" 
+           onblur="if(this.value=='')this.value='0';"></td>
+        <td><input type="number" class="unit_count" value="{{ p.unit_count }}" value="0" 
+           onfocus="if(this.value=='0')this.value='';" 
+           onblur="if(this.value=='')this.value='0';"></td>
     </tr>
     {% endfor %}
 </table>
