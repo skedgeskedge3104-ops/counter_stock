@@ -148,6 +148,7 @@ input[type="number"],
 select{
     width: calc(100% - 22px);
     padding: 10px;
+    font-size: 17px;
     margin-top: 5px;
     margin-bottom: 20px;
     border: 1px solid var(--secondary-color);
