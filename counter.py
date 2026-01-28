@@ -549,6 +549,37 @@ def api_get_stock(category):
         if cur: cur.close()
         if conn: conn.close()
 
+# -----------------------------
+# 玉数別在庫確認画面
+# -----------------------------   
+
+@app.route('/group_by_counts_stock')
+def group_by_counts():
+    conn=get_db_connection()
+    cur=conn.cursor()
+    
+    cur.execute("""
+                SELECT g.group_name, SUM(i.total_in - o.total_out) AS 合計 FROM group_by_counts AS g
+                INNER JOIN 
+                (
+                    SELECT p.group_name, COALESCE(SUM(i_in.received_quantity * p.quantity_box), 0) AS total_in FROM inventory_in AS i_in
+                    LEFT JOIN products AS p ON p.product_name = i_in.product_name WHERE p.category_name = 'お菓子'
+                    GROUP BY p.group_name
+                ) AS i ON g.group_name = i.group_name
+                LEFT JOIN
+                (
+                   SELECT p.group_name,COALESCE(SUM(i_out.shipped_quantity * p.quantity_box),0) AS total_out FROM inventory_out ASi_out
+                   LEFT JOIN products AS p ONp.product_name = i_out.product_name WHERE p.category_name = 'お菓子'
+                   GROUP BY p.group_name 
+                ) AS o ON g.group_name = o.group_name
+                GROUP BY g.group_name ORDER BY g.group_no;  
+                """)
+    counts = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    return render_template('group_by_counts_stock.html',counts=counts)
 
 
 # -----------------------------
