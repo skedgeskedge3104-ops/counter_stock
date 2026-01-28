@@ -579,7 +579,7 @@ def group_by_counts():
     cur.close()
     conn.close()
     
-    return render_template('group_by_counts_stock.html',counts=counts)
+    return render_template('group_by_counts_stock', counts=counts)
 
 
 # -----------------------------

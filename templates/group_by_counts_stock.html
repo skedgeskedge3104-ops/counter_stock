@@ -5,18 +5,19 @@
 {% block content %}
 <h2>玉数別在庫</h2>
 
-<table>
+<table border="1">
     <tr>
         <th>玉数</th>
         <th>在庫数</th>
     </tr>
     {% for count in counts %}
     <tr>
-        <td>{{count[0]}}</td>
-        <td>{{count[1]}}</td>
+        <td>{{ count[0] }}</td>
+        <td>{{ count[1] }}</td>
     </tr>
     {% endfor %}
 </table>
 
+<br>
 <a href="/">メニューに戻る</a>
-{% endblock %}
+{% endblock %} 
