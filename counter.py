@@ -568,7 +568,7 @@ def group_by_counts():
                 ) AS i ON g.group_name = i.group_name
                 LEFT JOIN
                 (
-                   SELECT p.group_name,COALESCE(SUM(i_out.shipped_quantity * p.quantity_box),0) AS total_out FROM inventory_out ASi_out
+                   SELECT p.group_name,COALESCE(SUM(i_out.shipped_quantity * p.quantity_box),0) AS total_out FROM inventory_out AS i_out
                    LEFT JOIN products AS p ONp.product_name = i_out.product_name WHERE p.category_name = 'お菓子'
                    GROUP BY p.group_name 
                 ) AS o ON g.group_name = o.group_name
