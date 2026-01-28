@@ -559,7 +559,7 @@ def group_by_counts():
     cur=conn.cursor()
     
     cur.execute("""
-                SELECT g.group_name, SUM(i.total_in - o.total_out) AS 合計 FROM group_by_counts AS g
+                SELECT g.group_name, COALESCE(SUM(i.total_in - COALESCE(o.total_out, 0)), 0) AS 合計 FROM group_by_counts AS g
                 INNER JOIN 
                 (
                     SELECT p.group_name, COALESCE(SUM(i_in.received_quantity * p.quantity_box), 0) AS total_in FROM inventory_in AS i_in
@@ -569,7 +569,7 @@ def group_by_counts():
                 LEFT JOIN
                 (
                    SELECT p.group_name,COALESCE(SUM(i_out.shipped_quantity * p.quantity_box),0) AS total_out FROM inventory_out AS i_out
-                   LEFT JOIN products AS p ONp.product_name = i_out.product_name WHERE p.category_name = 'お菓子'
+                   LEFT JOIN products AS p ON p.product_name = i_out.product_name WHERE p.category_name = 'お菓子'
                    GROUP BY p.group_name 
                 ) AS o ON g.group_name = o.group_name
                 GROUP BY g.group_name ORDER BY g.group_no;  
