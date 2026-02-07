@@ -12,17 +12,19 @@
     </tr>
 </table>
 
-{% for cost in costs %}
+
 <table class="cost-ratio-table">
     <tr>
         <th>商品名</th>
         <th>原価率</th>
     </tr>
+    {% for cost in costs %}
     <tr>
         <th>{{cost[0]}}</th>
         <th>{{cost[1]}}</th>
     </tr>
+    {% endfor %}
 </table>
-{% endfor %}
+
 
 {% endblock %}
