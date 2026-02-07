@@ -700,12 +700,40 @@ def tobacco_final_save():
         cur.close()
         conn.close()
 
-
+# -----------------------------
+# 原価率計算と表示
+# -----------------------------
 
 
 @app.route('/analysis')
 def analysis():
-    return render_template('analysis.html')
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute('''SELECT
+        SUM(i.received_quantity * p.unit_price * p.quantity_box) / SUM(i.received_quantity * g.values * p.quantity_box) AS 原価率
+        FROM inventory_in i
+        INNER JOIN products p
+        ON p.product_name = i.product_name
+        INNER JOIN group_by_counts g
+        ON g.group_name = p.group_name
+        WHERE p.category_name != 'たばこ';
+        ''')
+    
+    cost_percentage = cur.fetchone()
+    
+    cur.execute('''SELECT p.product_name,  round(
+        COALESCE((p.unit_price / g.values), 0)::NUMERIC,2) AS 原価率 FROM products as p
+        INNER JOIN group_by_counts  AS g ON p.group_name = g.group_name
+        WHERE p.category_name != 'たばこ'
+        GROUP BY p.product_name,g.values,g.group_name
+        ORDER BY 原価率 DESC;
+        ''')
+    
+    costs = cur.fetchall()
+    
+    
+    return render_template('analysis.html',cost_percentage=cost_percentage, costs=costs)
 
 
 if __name__ == '__main__':

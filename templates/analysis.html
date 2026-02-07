@@ -3,8 +3,25 @@
 {% block title %}分析{% endblock %}
 
 {% block content %}
-
-<p>分析</p>
-
+<table class="cost-percentage">
+    <tr>
+        <th>原価率</th>
+    </tr>
+    <tr>
+        <td>{{cost-percentage}}+"%"</td>
+    </tr>
+</table>
+{% for cost in costs %}
+<table class="cost-ratio-table">
+    <tr>
+        <th>商品名</th>
+        <th>原価率</th>
+    </tr>
+    <tr>
+        <th>{{cost[0]}}</th>
+        <th>{{cost[1]}}</th>
+    </tr>
+</table>
+{% endfor %}
 
 {% endblock %}
