@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}窪田主任用{% endblock %}
+
+{% block content %}
+
+<h1>窪田主任用ページ</h1>
+
+<table>
+  <tr>
+    <th>取引業者</th>
+    <th>玉数</th>
+    <th>商品名</th>
+    <th>入り数</th>
+    <th>単価</th>
+    <th>在庫合計</th>
+  </tr>
+  <tr>
+    {% for kubota in kubotas %}
+    <td>{{ kubota[0] }}</td>
+    <td>{{ kubota[1] }}</td>
+    <td>{{ kubota[2] }}</td>
+    <td>{{ kubota[3] }}</td>
+    <td>{{ kubota[4] }}</td>
+    <td>{{ kubota[5] }}</td>
+    {% endfor %}
+  </tr>
+</table>
+
+<a href="/">メインメニューへ戻る</a>
+
+{% endblock %}

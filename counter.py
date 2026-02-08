@@ -732,8 +732,41 @@ def analysis():
     
     costs = cur.fetchall()
     
+    cur.close()
+    conn.close()
+    
     
     return render_template('analysis.html',cost_percentage=cost_percentage, costs=costs)
+
+
+# -----------------------------
+# 窪田主任用ページ
+# -----------------------------
+
+@app.route('/kubota')
+def kubota():
+    conn=get_db_connection()
+    cur = conn.corsor()
+    
+    cur.execute('''
+                select p.shop_name,p.group_name,p.product_name,p.quantity_box,p.unit_price,(coalesce(i.total_in,0)-coalesce(o.total_out,0))*coalesce(p.quantity_box) as total_counts
+                from products as p 
+                inner join 
+                (select product_name ,sum(coalesce(received_quantity,0)) as total_in from inventory_in group by product_name) as i
+                on p.product_name = i.product_name
+                inner join
+                (select product_name, sum(coalesce(shipped_quantity,0))as total_out from inventory_out group by product_name) as o
+                on p.product_name = o.product_name
+                where p.category_name!= 'たばこ'
+                order by p.shop_name;
+                ''')
+    
+    kubotas = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    return render_template('kubota.html',kubotas=kubotas)
 
 
 if __name__ == '__main__':
