@@ -15,16 +15,16 @@
     <th>単価</th>
     <th>在庫合計</th>
   </tr>
+  {% for kubota in kubotas %}
   <tr>
-    {% for kubota in kubotas %}
     <td>{{ kubota[0] }}</td>
     <td>{{ kubota[1] }}</td>
     <td>{{ kubota[2] }}</td>
     <td>{{ kubota[3] }}</td>
     <td>{{ kubota[4] }}</td>
     <td>{{ kubota[5] }}</td>
-    {% endfor %}
   </tr>
+  {% endfor %}  
 </table>
 
 <a href="/">メインメニューへ戻る</a>
