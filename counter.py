@@ -746,7 +746,7 @@ def analysis():
 @app.route('/kubota')
 def kubota():
     conn=get_db_connection()
-    cur = conn.corsor()
+    cur = conn.cursor()
     
     cur.execute('''
                 select p.shop_name,p.group_name,p.product_name,p.quantity_box,p.unit_price,(coalesce(i.total_in,0)-coalesce(o.total_out,0))*coalesce(p.quantity_box) as total_counts
