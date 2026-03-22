@@ -55,6 +55,17 @@ a:hover{
     background-color: #ffc107;
 }
 
+/* 入出庫の編集・削除、棚卸（お菓子・ドリンク）の行削除など */
+button.btn-compact-action,
+input[type="submit"].btn-compact-action {
+    padding: 5px;
+    min-width: unset;
+    width: auto;
+    display: inline-block;
+    font-size: 0.875rem;
+    line-height: 1.2;
+}
+
 
 
 

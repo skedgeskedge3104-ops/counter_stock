@@ -9,9 +9,25 @@
 .sd-cat h3 { margin-top: 0; }
 .sd-tab-hint { background: #f0f7ff; border: 1px solid #9bd; padding: 0.6rem 0.75rem; margin: 0.5rem 0 0.75rem; font-size: 0.95rem; }
 .sd-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; align-items: center; }
-.sd-tabs-label { font-weight: bold; margin-right: 0.35rem; }
-.sd-tab-btn { padding: 0.45rem 0.85rem; cursor: pointer; border: 1px solid #888; background: #f5f5f5; border-radius: 4px; }
-.sd-tab-btn:hover { background: #e8e8e8; }
+.sd-tabs-label {
+    font-weight: bold;
+    margin-right: 0.35rem;
+    color: #1e2a33;
+    background: #e8eef2;
+    padding: 0.4rem 0.55rem;
+    border-radius: 4px;
+    border: 1px solid #c5d0d9;
+}
+/* 全体CSSの button { color: 薄色 } が効き、非アクティブタブで文字が消えるのを防ぐ */
+.sd-tab-btn {
+    padding: 0.45rem 0.85rem;
+    cursor: pointer;
+    border: 1px solid #888;
+    background: #eef2f5;
+    color: #1e2a33;
+    border-radius: 4px;
+}
+.sd-tab-btn:hover { background: #dde4ea; color: #0d1117; }
 .sd-tab-btn.active { background: #1a5276; color: #fff; border-color: #1a5276; }
 .sd-panel { display: none; }
 .sd-panel.active { display: block; }
@@ -234,7 +250,7 @@ function addLineRow(panel) {
     const tdDel = document.createElement("td");
     const del = document.createElement("button");
     del.type = "button";
-    del.className = "del-line-btn";
+    del.className = "del-line-btn btn-compact-action";
     del.textContent = "削除";
     tdDel.appendChild(del);
 
