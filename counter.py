@@ -1281,20 +1281,27 @@ def analysis_cost_ratio():
         FROM inventory_in i
         INNER JOIN products p ON p.product_name = i.product_name
         INNER JOIN group_by_counts g ON g.group_name = p.group_name
-        WHERE p.category_name != 'たばこ';
-        """
+        WHERE p.category_name IN %s;
+        """,
+        (tuple(SNACK_DRINK_CATEGORIES),),
     )
     cost_percentage = cur.fetchone()
 
     cur.execute(
-        """SELECT p.product_name, round(
+        """SELECT p.category_name, p.product_name, round(
         COALESCE((p.unit_price / g.values), 0)::NUMERIC, 2) AS 原価率
         FROM products AS p
         INNER JOIN group_by_counts AS g ON p.group_name = g.group_name
-        WHERE p.category_name != 'たばこ'
-        GROUP BY p.product_name, g.values, g.group_name
-        ORDER BY 原価率 DESC;
-        """
+        WHERE p.category_name IN %s
+        GROUP BY p.category_name, p.product_name, g.values, g.group_name
+        ORDER BY CASE p.category_name WHEN %s THEN 0 WHEN %s THEN 1 ELSE 2 END,
+            p.product_name;
+        """,
+        (
+            tuple(SNACK_DRINK_CATEGORIES),
+            SNACK_DRINK_CATEGORIES[0],
+            SNACK_DRINK_CATEGORIES[1],
+        ),
     )
     costs = cur.fetchall()
     cur.close()
