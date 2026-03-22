@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}端玉お菓子・ドリンク 集計結果{% endblock %}
+
+{% block content %}
+
+<h2>GROUP 名別 統合集計</h2>
+<p>{{ snack_label }} と {{ drink_label }} のタブ合計（DB 在庫＋入力分）を、同じ GROUP 名で足し合わせています。</p>
+
+<p>
+    <a href="{{ url_for('inventory_check_snack_drink') }}">入力画面に戻る</a>
+    · <a href="{{ url_for('inventory_check_menu') }}">棚卸メニュー</a>
+</p>
+
+<table border="1" style="min-width: 28rem; border-collapse: collapse;">
+    <thead>
+        <tr>
+            <th>GROUP 名（玉数）</th>
+            <th>{{ snack_label }}</th>
+            <th>{{ drink_label }}</th>
+            <th>合計</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in rows %}
+        <tr>
+            <td>{{ r.group_name }}</td>
+            <td>{{ r.snack_total }}</td>
+            <td>{{ r.drink_total }}</td>
+            <td><strong>{{ r.combined }}</strong></td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="4">集計対象のグループがありません</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p style="margin-top: 1.5rem;"><a href="{{ url_for('index') }}">メニューに戻る</a></p>
+
+{% endblock %}

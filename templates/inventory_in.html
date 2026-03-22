@@ -10,17 +10,22 @@
     <div class="menu-container" style="text-align: center;">
         <h2>入庫</h2>
         <form method="post" onsubmit="alert('登録されました');">
-            <label for="group_name">玉数名</label><br>
-            <select name="group_name" id="group_name" onchange="getProductData()">
-                <option value="" disabled selected>玉数選択</option>
-                {% for g_name in group_names %}
-                    <option value="{{g_name}}">{{g_name}}</option>
+            <label for="category_name">カテゴリ</label><br>
+            <select name="category_name_sel" id="category_name" onchange="onCategoryChange()">
+                <option value="" disabled selected>カテゴリ選択</option>
+                {% for c in category_names %}
+                    <option value="{{ c }}">{{ c }}</option>
                 {% endfor %}
+            </select>
+            <br><br>
+            <label for="group_name">玉数</label><br>
+            <select name="group_name" id="group_name" onchange="onGroupChange()">
+                <option value="" disabled selected>先にカテゴリを選択</option>
             </select>
             <br><br>
             <label for="product_name">商品名</label><br>
             <select name="product_name" id="product_name">
-                <option value=" disabled selected">商品名選択</option>
+                <option value="" disabled selected>商品名を選択</option>
             </select>
             <br><br>
             <label for="received_quantity">入庫数</label><br>
@@ -30,6 +35,7 @@
             <button type="submit">登録</button>
         </form>
         <br>
+        <a href="{{ url_for('inventory_in_history') }}">入庫履歴（日付指定）</a><br>
         <a href="import">ｃｓｖから入庫する</a><br>
         <a href="/">メインメニューに戻る</a>
     </div>
@@ -41,6 +47,7 @@
                 <th>商品名</th>
                 <th>入庫数</th>
                 <th>入庫日</th>
+                <th>操作</th>
             </tr>
         </thead>
         <tbody>
@@ -49,7 +56,15 @@
                 <td>{{ item[2] }}</td>
                 <td>{{ item[1] }}</td>
                 <td>{{ item[3] }}</td>
-                <td>{{ item[4].strftime('%y,%m,%d')  }}</td>
+                <td>{{ item[4]|ts_display }}</td>
+                <td>
+                    <form action="{{ url_for('edit_in', in_id=item[0]) }}" method="get" style="display:inline;">
+                        <button type="submit">編集</button>
+                    </form>
+                    <form action="{{ url_for('delete_in', in_id=item[0]) }}" method="post" style="display:inline;" onsubmit="return confirm('削除しますか？');">
+                        <button type="submit">削除</button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -73,28 +88,49 @@
     </table>
     
 <script>
-    async function getProductData(){
+    async function onCategoryChange() {
+        const cat = document.getElementById('category_name').value;
         const groupSelect = document.getElementById('group_name');
         const productSelect = document.getElementById('product_name');
+        productSelect.innerHTML = '<option value="" disabled selected>商品名を選択</option>';
+        if (!cat) {
+            groupSelect.innerHTML = '<option value="" disabled selected>先にカテゴリを選択</option>';
+            return;
+        }
+        try {
+            const res = await fetch('/api/group_names_by_category/' + encodeURIComponent(cat));
+            const groups = await res.json();
+            groupSelect.innerHTML = '<option value="" disabled selected>玉数選択</option>';
+            groups.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                groupSelect.appendChild(opt);
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
 
+    async function onGroupChange() {
+        const cat = document.getElementById('category_name').value;
+        const groupSelect = document.getElementById('group_name');
+        const productSelect = document.getElementById('product_name');
         const selectedGroup = groupSelect.value;
-
-        if (!selectedGroup) return;
-
-        try{
-            const response = await fetch(`/get_product_names/${selectedGroup}`);
-            const data = await response.json();
-
-            productSelect.innerHTML = '<option value="" disabled selected>商品名を選択</option>';
-
+        productSelect.innerHTML = '<option value="" disabled selected>商品名を選択</option>';
+        if (!cat || !selectedGroup) return;
+        try {
+            const q = new URLSearchParams({ category: cat, group_name: selectedGroup });
+            const res = await fetch('/get_product_names_for?' + q.toString());
+            const data = await res.json();
             data.forEach(name => {
                 const option = document.createElement('option');
                 option.value = name;
                 option.textContent = name;
                 productSelect.appendChild(option);
             });
-        }catch(error){
-            console.error('Fetch error:', error)
+        } catch (error) {
+            console.error('Fetch error:', error);
         }
     }
 </script>

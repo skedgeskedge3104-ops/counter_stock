@@ -1,0 +1,353 @@
+{% extends 'base.html' %}
+
+{% block title %}端玉お菓子・ドリンク 棚卸{% endblock %}
+
+{% block content %}
+
+<style>
+.sd-cat { margin: 2em 0; border: 1px solid #ccc; padding: 1em; max-width: 56rem; margin-left: auto; margin-right: auto; }
+.sd-cat h3 { margin-top: 0; }
+.sd-tab-hint { background: #f0f7ff; border: 1px solid #9bd; padding: 0.6rem 0.75rem; margin: 0.5rem 0 0.75rem; font-size: 0.95rem; }
+.sd-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; align-items: center; }
+.sd-tabs-label { font-weight: bold; margin-right: 0.35rem; }
+.sd-tab-btn { padding: 0.45rem 0.85rem; cursor: pointer; border: 1px solid #888; background: #f5f5f5; border-radius: 4px; }
+.sd-tab-btn:hover { background: #e8e8e8; }
+.sd-tab-btn.active { background: #1a5276; color: #fff; border-color: #1a5276; }
+.sd-panel { display: none; }
+.sd-panel.active { display: block; }
+.sd-panel table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+.sd-panel th, .sd-panel td { border: 1px solid #ccc; padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; }
+.sd-panel .num-inp { width: 4.5rem; }
+.sd-panel .mul-inp { width: 3.5rem; }
+.mode-fields { display: none; margin-top: 0.25rem; }
+.mode-fields.visible { display: block; }
+.mul-row { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.sd-actions { margin-top: 1.5rem; text-align: center; }
+.db-stock-label { font-size: 1.05rem; margin: 0.5rem 0; }
+.tab-total-line { font-weight: bold; margin-top: 0.5rem; }
+</style>
+
+<h2>端玉お菓子・ドリンク 棚卸</h2>
+
+<div class="sd-tab-hint">
+    <strong>タブの切り替え方:</strong> 各カテゴリ（端玉お菓子／ドリンク）のブロック内で、上の <strong>GROUP 名（玉数）のボタン</strong>をクリックすると、そのグループ用の入力エリアに切り替わります。色が濃いボタンが、いま表示中のタブです。
+</div>
+
+<p>各タブで DB 在庫を確認し、行ごとに <strong>入力種別</strong>を選びます。<strong>商品名</strong>は「数量×入り数（quantity_box）」、<strong>掛け算</strong>は2つの数の積、<strong>バラ（足し算）</strong>は数量をそのまま加算します。タブ内の合計は <strong>DB 在庫＋入力分の合計</strong>です。</p>
+
+<p><a href="{{ url_for('inventory_check_menu') }}">棚卸カテゴリ一覧に戻る</a></p>
+
+{% for cat in snack_drink_categories %}
+<section class="sd-cat" data-category="{{ cat }}">
+    <h3>{{ cat }}</h3>
+    {% set groups = bootstrap[cat] if cat in bootstrap else [] %}
+    {% if groups|length == 0 %}
+    <p>このカテゴリに該当する商品・グループがありません（商品登録を確認してください）。</p>
+    {% else %}
+    <div class="sd-tabs">
+        <span class="sd-tabs-label">GROUP（玉数）:</span>
+        {% for g in groups %}
+        <button type="button" class="sd-tab-btn{% if loop.first %} active{% endif %}" data-idx="{{ loop.index0 }}" title="このグループのタブを表示">{{ g.group_name }}</button>
+        {% endfor %}
+    </div>
+    {% for g in groups %}
+    <div class="sd-panel{% if loop.first %} active{% endif %}" data-idx="{{ loop.index0 }}" data-group="{{ g.group_name }}" data-db="{{ g.db_stock }}">
+        <p class="db-stock-label">DB 在庫（理論値）: <strong class="db-val">{{ g.db_stock }}</strong></p>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:11rem;">入力種別</th>
+                    <th>入力内容</th>
+                    <th style="width:4rem;"></th>
+                </tr>
+            </thead>
+            <tbody class="lines-tbody"></tbody>
+        </table>
+        <button type="button" class="add-line-btn">行を追加</button>
+        <p class="tab-total-line">タブ合計（DB＋入力分）: <span class="tab-total">0</span></p>
+    </div>
+    {% endfor %}
+    {% endif %}
+</section>
+{% endfor %}
+
+<div class="sd-actions">
+    <button type="button" id="sdSubmitBtn">集計結果へ</button>
+</div>
+
+<script>
+const BOOTSTRAP = {{ bootstrap | tojson }};
+const CATEGORIES = {{ snack_drink_categories | tojson }};
+const URL_CONFIRM = {{ url_for('inventory_check_snack_drink_confirm') | tojson }};
+const URL_RESULT = {{ url_for('inventory_check_snack_drink_result') | tojson }};
+
+function productsFor(cat, groupName) {
+    const groups = BOOTSTRAP[cat] || [];
+    const gr = groups.find(x => x.group_name === groupName);
+    return (gr && gr.products) ? gr.products : [];
+}
+
+function setModeFieldsVisible(tr) {
+    const mode = tr.querySelector(".mode-select").value;
+    tr.querySelectorAll(".mode-fields").forEach(el => {
+        el.classList.toggle("visible", el.getAttribute("data-mode") === mode);
+    });
+}
+
+function rowContrib(tr) {
+    const modeSel = tr.querySelector(".mode-select");
+    if (!modeSel) return 0;
+    const mode = modeSel.value;
+    if (mode === "product") {
+        const sel = tr.querySelector(".prod-select");
+        const qtyInp = tr.querySelector(".qty-product");
+        if (!sel || !sel.value || !qtyInp) return 0;
+        const qty = parseInt(qtyInp.value || "0", 10) || 0;
+        const opt = sel.selectedOptions[0];
+        const box = parseInt((opt && opt.dataset.quantityBox) || "1", 10) || 1;
+        return qty * box;
+    }
+    if (mode === "mul") {
+        const a = parseInt(tr.querySelector(".mul-a")?.value || "0", 10) || 0;
+        const b = parseInt(tr.querySelector(".mul-b")?.value || "0", 10) || 0;
+        return a * b;
+    }
+    if (mode === "add") {
+        return parseInt(tr.querySelector(".qty-add")?.value || "0", 10) || 0;
+    }
+    return 0;
+}
+
+function recalcPanel(panel) {
+    const db = parseFloat(panel.dataset.db || "0") || 0;
+    let adj = 0;
+    panel.querySelectorAll(".line-row").forEach(tr => {
+        adj += rowContrib(tr);
+    });
+    const span = panel.querySelector(".tab-total");
+    if (span) span.textContent = String(db + adj);
+}
+
+function addLineRow(panel) {
+    const cat = panel.closest(".sd-cat").dataset.category;
+    const groupName = panel.dataset.group;
+    const products = productsFor(cat, groupName);
+    const tr = document.createElement("tr");
+    tr.className = "line-row";
+
+    const tdMode = document.createElement("td");
+    const modeSel = document.createElement("select");
+    modeSel.className = "mode-select";
+    [
+        ["product", "商品名（数量×入り数）"],
+        ["mul", "掛け算（2数の積）"],
+        ["add", "バラ（足し算）"]
+    ].forEach(([v, t]) => {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = t;
+        modeSel.appendChild(o);
+    });
+    tdMode.appendChild(modeSel);
+
+    const tdBody = document.createElement("td");
+
+    const wrapP = document.createElement("div");
+    wrapP.className = "mode-fields visible";
+    wrapP.setAttribute("data-mode", "product");
+    const selP = document.createElement("select");
+    selP.className = "prod-select";
+    const o0 = document.createElement("option");
+    o0.value = "";
+    o0.textContent = "— 商品を選択 —";
+    selP.appendChild(o0);
+    if (products.length === 0) {
+        const od = document.createElement("option");
+        od.value = "";
+        od.disabled = true;
+        od.textContent = "入出庫履歴のある商品がありません";
+        selP.appendChild(od);
+    } else {
+        products.forEach(p => {
+            const o = document.createElement("option");
+            o.value = p.product_name;
+            o.textContent = p.product_name;
+            o.dataset.quantityBox = String(p.quantity_box != null ? p.quantity_box : 1);
+            selP.appendChild(o);
+        });
+    }
+    const lab1 = document.createElement("span");
+    lab1.textContent = " 数量（箱・単位の個数）: ";
+    const qtyP = document.createElement("input");
+    qtyP.type = "number";
+    qtyP.className = "num-inp qty-product";
+    qtyP.min = "0";
+    qtyP.step = "1";
+    qtyP.value = "0";
+    wrapP.appendChild(selP);
+    wrapP.appendChild(lab1);
+    wrapP.appendChild(qtyP);
+    const hintP = document.createElement("div");
+    hintP.style.cssText = "font-size:0.85rem;color:#555;margin-top:0.25rem;";
+    hintP.textContent = "加算値 ＝ 上記数量 × 商品マスタの入り数（quantity_box）";
+    wrapP.appendChild(hintP);
+
+    const wrapM = document.createElement("div");
+    wrapM.className = "mode-fields";
+    wrapM.setAttribute("data-mode", "mul");
+    const mulRow = document.createElement("div");
+    mulRow.className = "mul-row";
+    const ma = document.createElement("input");
+    ma.type = "number";
+    ma.className = "mul-inp mul-a";
+    ma.step = "1";
+    ma.value = "0";
+    const mx = document.createElement("span");
+    mx.textContent = " × ";
+    const mb = document.createElement("input");
+    mb.type = "number";
+    mb.className = "mul-inp mul-b";
+    mb.step = "1";
+    mb.value = "0";
+    mulRow.appendChild(ma);
+    mulRow.appendChild(mx);
+    mulRow.appendChild(mb);
+    wrapM.appendChild(mulRow);
+
+    const wrapA = document.createElement("div");
+    wrapA.className = "mode-fields";
+    wrapA.setAttribute("data-mode", "add");
+    const labA = document.createElement("span");
+    labA.textContent = "数量（そのまま加算）: ";
+    const qtyA = document.createElement("input");
+    qtyA.type = "number";
+    qtyA.className = "num-inp qty-add";
+    qtyA.step = "1";
+    qtyA.value = "0";
+    wrapA.appendChild(labA);
+    wrapA.appendChild(qtyA);
+
+    tdBody.appendChild(wrapP);
+    tdBody.appendChild(wrapM);
+    tdBody.appendChild(wrapA);
+
+    const tdDel = document.createElement("td");
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "del-line-btn";
+    del.textContent = "削除";
+    tdDel.appendChild(del);
+
+    tr.appendChild(tdMode);
+    tr.appendChild(tdBody);
+    tr.appendChild(tdDel);
+
+    const bindRecalc = () => recalcPanel(panel);
+    modeSel.addEventListener("change", () => {
+        setModeFieldsVisible(tr);
+        bindRecalc();
+    });
+    selP.addEventListener("change", bindRecalc);
+    qtyP.addEventListener("input", bindRecalc);
+    ma.addEventListener("input", bindRecalc);
+    mb.addEventListener("input", bindRecalc);
+    qtyA.addEventListener("input", bindRecalc);
+    del.addEventListener("click", () => {
+        tr.remove();
+        bindRecalc();
+    });
+
+    panel.querySelector(".lines-tbody").appendChild(tr);
+    setModeFieldsVisible(tr);
+    recalcPanel(panel);
+}
+
+document.querySelectorAll(".sd-cat").forEach(section => {
+    section.querySelectorAll(".sd-tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const idx = btn.dataset.idx;
+            section.querySelectorAll(".sd-tab-btn").forEach(b => b.classList.remove("active"));
+            section.querySelectorAll(".sd-panel").forEach(p => p.classList.remove("active"));
+            btn.classList.add("active");
+            const panel = section.querySelector(`.sd-panel[data-idx="${idx}"]`);
+            if (panel) panel.classList.add("active");
+        });
+    });
+    section.querySelectorAll(".add-line-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const panel = btn.closest(".sd-panel");
+            if (panel) addLineRow(panel);
+        });
+    });
+    section.querySelectorAll(".sd-panel").forEach(panel => {
+        if (panel.querySelector(".lines-tbody").children.length === 0) {
+            addLineRow(panel);
+        } else {
+            recalcPanel(panel);
+        }
+    });
+});
+
+function collectPayload() {
+    const out = {};
+    CATEGORIES.forEach(cat => { out[cat] = {}; });
+    document.querySelectorAll(".sd-cat").forEach(section => {
+        const cat = section.dataset.category;
+        section.querySelectorAll(".sd-panel").forEach(panel => {
+            const g = panel.dataset.group;
+            const db = parseFloat(panel.dataset.db || "0") || 0;
+            const lines = [];
+            panel.querySelectorAll(".line-row").forEach(tr => {
+                const mode = tr.querySelector(".mode-select").value;
+                if (mode === "product") {
+                    const sel = tr.querySelector(".prod-select");
+                    if (!sel.value) return;
+                    const opt = sel.selectedOptions[0];
+                    const box = parseInt((opt && opt.dataset.quantityBox) || "1", 10) || 1;
+                    lines.push({
+                        mode: "product",
+                        product_name: sel.value,
+                        quantity: parseInt(tr.querySelector(".qty-product").value || "0", 10) || 0,
+                        quantity_box: box
+                    });
+                } else if (mode === "mul") {
+                    lines.push({
+                        mode: "mul",
+                        a: parseInt(tr.querySelector(".mul-a").value || "0", 10) || 0,
+                        b: parseInt(tr.querySelector(".mul-b").value || "0", 10) || 0
+                    });
+                } else if (mode === "add") {
+                    lines.push({
+                        mode: "add",
+                        quantity: parseInt(tr.querySelector(".qty-add").value || "0", 10) || 0
+                    });
+                }
+            });
+            out[cat][g] = { db_stock: db, lines };
+        });
+    });
+    return out;
+}
+
+document.getElementById("sdSubmitBtn").addEventListener("click", () => {
+    const body = collectPayload();
+    fetch(URL_CONFIRM, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === "ok") {
+            window.location.href = URL_RESULT;
+        } else {
+            alert("送信に失敗しました");
+        }
+    })
+    .catch(() => alert("通信エラー"));
+});
+</script>
+
+<p style="text-align:center;margin-top:1rem;"><a href="{{ url_for('index') }}">メニューに戻る</a></p>
+
+{% endblock %}

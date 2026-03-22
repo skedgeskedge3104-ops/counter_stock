@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}棚卸履歴{% endblock %}
+
+{% block content %}
+
+<h2>棚卸結果の履歴</h2>
+<p>日本時間（Asia/Tokyo）の日付で、DB に保存された棚卸（<code>inventory_check</code>）を表示します。</p>
+
+<form method="get" action="{{ url_for('inventory_check_history') }}" style="margin: 1rem 0;">
+    <label for="hist_date">日付</label>
+    <input type="date" id="hist_date" name="date" value="{{ selected_date }}" required>
+    <button type="submit">表示</button>
+</form>
+
+<p>
+    <a href="{{ url_for('inventory_check_menu') }}">棚卸入力メニュー</a>
+    · <a href="{{ url_for('index') }}">メインメニュー</a>
+</p>
+
+{% if rows|length == 0 %}
+<p>この日付の棚卸記録はありません。</p>
+{% else %}
+<table border="1" style="border-collapse: collapse; width: 100%; max-width: 56rem;">
+    <thead>
+        <tr>
+            <th>カテゴリ</th>
+            <th>GROUP</th>
+            <th>商品名</th>
+            <th>棚(in_shelf)</th>
+            <th>バラ(unit)</th>
+            <th>POS</th>
+            <th>計上日</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in rows %}
+        <tr>
+            <td>{{ r[0] }}</td>
+            <td>{{ r[2] }}</td>
+            <td>{{ r[1] }}</td>
+            <td>{{ r[3] }}</td>
+            <td>{{ r[4] }}</td>
+            <td>{{ r[5] }}</td>
+            <td>{{ r[6] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% endblock %}

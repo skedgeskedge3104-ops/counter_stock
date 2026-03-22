@@ -1,12 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}たばこ棚卸入力{% endblock %}
+{% block title %}{{ category_name }} — 棚卸入力{% endblock %}
 
 {% block content %}
 
-<h2>たばこ棚卸入力</h2>
+<h2>{{ category_name }} 棚卸入力</h2>
 
-<table border="1" id="tobaccoTable">
+<p><a href="{{ url_for('inventory_check_menu') }}">カテゴリ選択に戻る</a></p>
+
+<table border="1" id="inventoryTable">
     <tr>
         <th>銘柄</th>
         <th>DB在庫</th>
@@ -14,7 +16,7 @@
         <th>unit_count (バラ)</th>
     </tr>
 
-   {% for p in products %}
+    {% for p in products %}
     <tr>
         <td>
             {{ p.product_name }}
@@ -23,11 +25,11 @@
             <input type="hidden" class="db_stock" value="{{ p.db_stock }}">
         </td>
         <td>{{ p.db_stock }}</td>
-        <td><input type="number" class="in_shelf" value="{{ p.in_shelf_count }}" value="0" 
-           onfocus="if(this.value=='0')this.value='';" 
+        <td><input type="number" class="in_shelf" value="{{ p.in_shelf_count }}"
+           onfocus="if(this.value=='0')this.value='';"
            onblur="if(this.value=='')this.value='0';"></td>
-        <td><input type="number" class="unit_count" value="{{ p.unit_count }}" value="0" 
-           onfocus="if(this.value=='0')this.value='';" 
+        <td><input type="number" class="unit_count" value="{{ p.unit_count }}"
+           onfocus="if(this.value=='0')this.value='';"
            onblur="if(this.value=='')this.value='0';"></td>
     </tr>
     {% endfor %}
@@ -37,8 +39,9 @@
 <button type="button" id="confirmBtn">次へ（グループ別集計へ）</button>
 
 <script>
+const categoryName = {{ category_name | tojson }};
 document.getElementById("confirmBtn").addEventListener("click", () => {
-    const rows = document.querySelectorAll("#tobaccoTable tr:not(:first-child)");
+    const rows = document.querySelectorAll("#inventoryTable tr:not(:first-child)");
     const finalData = Array.from(rows).map(row => {
         return {
             product_name: row.querySelector(".product_name").value,
@@ -49,18 +52,18 @@ document.getElementById("confirmBtn").addEventListener("click", () => {
         };
     });
 
-    fetch("/tobacco_check/confirm", {
+    fetch("{{ url_for('inventory_check_confirm') }}", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(finalData)
+        body: JSON.stringify({ category_name: categoryName, items: finalData })
     })
     .then(res => res.json())
     .then(data => {
-        if(data.status === "ok") {
-            window.location.href = "/tobacco_result";
+        if (data.status === "ok") {
+            window.location.href = "{{ url_for('inventory_check_result') }}";
         }
     })
-    .catch(err => alert("送信エラーが発生しました"));
+    .catch(() => alert("送信エラーが発生しました"));
 });
 </script>
 {% endblock %}

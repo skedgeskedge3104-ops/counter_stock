@@ -10,6 +10,7 @@
     <button onclick="loadStock('お菓子')">お菓子</button>
     <button onclick="loadStock('ドリンク')">ドリンク</button>
     <button onclick="loadStock('たばこ')">たばこ</button>
+    <button onclick="loadStock('ポイント景品')">ポイント景品</button>
     <br>
     <a href="group_by_counts_stock" style="width: 150px; text-align: left;">玉数別在庫数はこちら</a>
 </div>
@@ -20,7 +21,7 @@
 <table border="1">
     <thead>
         <tr>
-            <th>玉数</th>
+            <th id="colGroupLabel">玉数</th>
             <th>商品名</th>
             <th>在庫数</th>
         </tr>
@@ -40,7 +41,10 @@
 function loadStock(category) {
     const tbody = document.getElementById('stockTableBody');
     const title = document.getElementById('currentCategoryTitle');
-    
+    const colGroupLabel = document.getElementById('colGroupLabel');
+
+    colGroupLabel.textContent = category === 'ポイント景品' ? 'ポイント数' : '玉数';
+
     // タイトルの更新
     title.textContent = `表示中: ${category}`;
     // 読み込み中の表示
@@ -63,8 +67,11 @@ function loadStock(category) {
             // 取得したデータをループしてテーブルを作成
             data.forEach(item => {
                 const row = document.createElement('tr');
+                const col1 = (category === 'ポイント景品' && item.point_value != null)
+                    ? item.point_value
+                    : item.group;
                 row.innerHTML = `
-                    <td>${item.group}</td>
+                    <td>${col1}</td>
                     <td>${item.name}</td>
                     <td class="stock-val">${item.stock}</td>
                 `;

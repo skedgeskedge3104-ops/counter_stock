@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ category_name }} — 在庫（グループ別）{% endblock %}
+
+{% block content %}
+
+<h2>{{ category_name }}</h2>
+<p>ポイント景品は棚卸の対象外です。玉数グループ別の理論在庫合計を表示しています。</p>
+<p>在庫の計算: 入庫合計×入り数 − 出庫合計（出庫は入り数を掛けません）</p>
+
+<p><a href="{{ url_for('inventory_check_menu') }}">カテゴリ選択に戻る</a></p>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>グループ名</th>
+            <th>在庫合計</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for g in point_groups %}
+        <tr>
+            <td>{{ g.group_name }}</td>
+            <td>{{ g.stock_total }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="2">該当する商品グループがありません</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p><a href="{{ url_for('index') }}">メニューに戻る</a></p>
+
+{% endblock %}

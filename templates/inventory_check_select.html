@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}棚卸入力 — カテゴリ選択{% endblock %}
+
+{% block content %}
+
+<h2>棚卸入力</h2>
+<p>カテゴリを選んでください。</p>
+
+<p style="margin: 1em 0;">
+    <a href="{{ url_for('inventory_check_history') }}">棚卸結果の履歴（日付指定）</a>
+</p>
+{% if show_snack_drink_link %}
+<p style="margin: 1em 0;">
+    <a href="{{ url_for('inventory_check_snack_drink') }}">端玉お菓子・ドリンク棚卸（グループ別タブ・統合集計）</a>
+</p>
+{% endif %}
+
+<ul style="list-style: none; padding: 0;">
+    {% for c in categories %}
+    <li style="margin: 0.5em 0;">
+        <a href="{{ url_for('inventory_check', category=c) }}">{{ c }}</a>
+    </li>
+    {% else %}
+    <li>登録されているカテゴリがありません。先にカテゴリ・商品を登録してください。</li>
+    {% endfor %}
+</ul>
+
+<p><a href="{{ url_for('index') }}">メニューに戻る</a></p>
+
+{% endblock %}

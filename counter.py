@@ -14,6 +14,46 @@ import pytz
 app=Flask(__name__)
 app.secret_key = "super-secret-key"
 
+# ポイント景品は在庫 = 入庫×入り数 − 出庫（出庫は入り数を掛けない）
+POINT_PRIZE_CATEGORY = "ポイント景品"
+
+# 端玉お菓子・ドリンク: タブ式入力し、GROUP 名で両カテゴリ合算表示
+SNACK_DRINK_CATEGORIES = ("端玉お菓子", "ドリンク")
+SNACK_DRINK_CATEGORY_SET = frozenset(SNACK_DRINK_CATEGORIES)
+
+
+def _format_ts_display(value):
+    """入出庫一覧の日付表示。psycopg2 が datetime でも str でも受け付ける。"""
+    if value is None:
+        return ''
+    if isinstance(value, str):
+        s = value.strip().replace('T', ' ')
+        if len(s) >= 10 and s[4] == '-' and s[7] == '-':
+            y, m, d = s[:10].split('-')
+            return f"{y[-2:]},{m},{d}"
+        return s
+    if isinstance(value, (datetime.datetime, datetime.date)):
+        return value.strftime('%y,%m,%d')
+    return str(value)
+
+
+@app.template_filter('ts_display')
+def ts_display_filter(value):
+    return _format_ts_display(value)
+
+
+def _today_jst_iso():
+    return datetime.datetime.now(pytz.timezone("Asia/Tokyo")).date().isoformat()
+
+
+def _parse_iso_date(s):
+    if not s:
+        return None
+    try:
+        return datetime.date.fromisoformat(str(s).strip())
+    except (ValueError, TypeError, AttributeError):
+        return None
+
 
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
@@ -272,31 +312,100 @@ def register_product():
 
 # -----------------------------
 # 入庫
-# -----------------------------            
+# -----------------------------
+
+
+@app.route('/inventory_in/history')
+def inventory_in_history():
+    raw = request.args.get("date") or _today_jst_iso()
+    view_date = _parse_iso_date(raw) or _parse_iso_date(_today_jst_iso())
+    date_str = view_date.isoformat()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT in_id, product_name, group_name, received_quantity, received_day
+        FROM inventory_in
+        WHERE DATE(timezone('Asia/Tokyo', received_day)) = %s
+        ORDER BY received_day DESC, in_id;
+        """,
+        (view_date,),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template(
+        "inventory_in_history.html",
+        rows=rows,
+        selected_date=date_str,
+    )
+
+
+@app.route('/inventory_in/<int:in_id>/edit', methods=["GET", "POST"])
+def edit_in(in_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM inventory_in WHERE in_id = %s", (in_id,))
+    item = cur.fetchone()
+    if not item:
+        cur.close()
+        conn.close()
+        return redirect(url_for("inventory_in"))
+    history_date = request.args.get("history_date") or request.form.get("history_date")
+
+    if request.method == "POST":
+        received_quantity = request.form.get("received_quantity")
+        cur.execute(
+            "UPDATE inventory_in SET received_quantity = %s WHERE in_id = %s;",
+            (received_quantity, in_id),
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        if history_date and _parse_iso_date(history_date):
+            return redirect(url_for("inventory_in_history", date=history_date))
+        return redirect(url_for("inventory_in"))
+
+    cur.close()
+    conn.close()
+    return render_template("edit_in.html", item=item, history_date=history_date)
+
+
+@app.route("/inventory_in/<int:in_id>/delete", methods=["POST"])
+def delete_in(in_id):
+    history_date = request.form.get("history_date")
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM inventory_in WHERE in_id = %s", (in_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    if history_date and _parse_iso_date(history_date):
+        return redirect(url_for("inventory_in_history", date=history_date))
+    return redirect(url_for("inventory_in"))
+
 
 @app.route('/inventory_in', methods = ('GET','POST'))
 def inventory_in():
-    group_names =  []
-    product_names = []
-    
+    category_names = []
+    inventory_in = []
+    total_in = []
+    conn = None
+    cur = None
+
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        cur.execute('SELECT * FROM group_by_counts;')
-        group_names = [row[1] for row in cur.fetchall()]
-        
-        cur.execute('SELECT product_name FROM products;')
-        product_names = [row[0] for row in cur.fetchall()]
-        
+        cur.execute('SELECT category_name FROM categories ORDER BY category_name;')
+        category_names = [row[0] for row in cur.fetchall()]
+
         cur.execute("SELECT * FROM inventory_in WHERE DATE(received_day) = DATE(timezone('Asia/Tokyo',now())); ")
         inventory_in = cur.fetchall()
         
         cur.execute("SELECT p.group_name, SUM(i_in.received_quantity)*p.quantity_box AS 入庫合計 FROM inventory_in AS i_in LEFT JOIN products AS p ON p.product_name = i_in.product_name WHERE DATE(i_in.received_day)=DATE(TIMEZONE('Asia/Tokyo',Now())) GROUP BY i_in.received_quantity,p.group_name, p.quantity_box; ")
         total_in = cur.fetchall()
-        
-        cur.close()
-        
+
     except Exception as e:
         print(f'error:{e}')
         
@@ -328,14 +437,20 @@ def inventory_in():
                 conn.close()
                 
         except Exception as e:
-            conn.rollback()
+            if conn:
+                conn.rollback()
             print(f'error:{e}')
             return f'error:{e}'
         
     
         return redirect(url_for('inventory_in'))
         
-    return render_template('inventory_in.html', group_names = group_names, product_names = product_names, inventory_in = inventory_in , total_in=total_in)
+    return render_template(
+        'inventory_in.html',
+        category_names=category_names,
+        inventory_in=inventory_in,
+        total_in=total_in
+    )
 
 @app.route('/import', methods=['GET','POST'])
 def import_csv():
@@ -377,32 +492,55 @@ def import_csv():
             return redirect(url_for('index'))
             
         except Exception as e:
-            conn.rollback()
-            return f'error:{e}' 
-        
-    
+            if conn:
+                conn.rollback()
+            return f'error:{e}'
+
     return render_template('import.html')
 
 # -----------------------------
 # 出庫
 # -----------------------------
 
+
+@app.route("/inventory_out/history")
+def inventory_out_history():
+    raw = request.args.get("date") or _today_jst_iso()
+    view_date = _parse_iso_date(raw) or _parse_iso_date(_today_jst_iso())
+    date_str = view_date.isoformat()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT out_id, product_name, group_name, shipped_quantity, shipped_day
+        FROM inventory_out
+        WHERE DATE(timezone('Asia/Tokyo', shipped_day)) = %s
+        ORDER BY shipped_day DESC, out_id;
+        """,
+        (view_date,),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template(
+        "inventory_out_history.html",
+        rows=rows,
+        selected_date=date_str,
+    )
+
+
 @app.route('/inventory_out', methods=['GET','POST'])
 def inventory_out():
-    group_names = []
-    
+    category_names = []
     conn = None
     cur = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        cur.execute('SELECT * FROM group_by_counts;')
-        group_names = [row[1] for row in cur.fetchall()]
-        
-        cur.execute('SELECT product_name FROM products;')
-        product_names = [row[0] for row in cur.fetchall()]
-        
+        cur.execute('SELECT category_name FROM categories ORDER BY category_name;')
+        category_names = [row[0] for row in cur.fetchall()]
+
         cur.execute("SELECT * FROM inventory_out WHERE DATE(shipped_day)=DATE(timezone('Asia/Tokyo',now()));")
         inventory_out = cur.fetchall()
 
@@ -419,18 +557,23 @@ def inventory_out():
             
             return redirect(url_for('inventory_out'))
             
-        return render_template('inventory_out.html', group_names=group_names, product_names=product_names, inventory_out = inventory_out)
+        return render_template(
+            'inventory_out.html',
+            category_names=category_names,
+            inventory_out=inventory_out
+        )
     
     except Exception as e:
-                conn.rollback()
-                return f'error:{e}'
-            
+        if conn:
+            conn.rollback()
+        return f'error:{e}'
+
     finally:
         if cur:
             cur.close()
         if conn:
-            conn.close()     
-            
+            conn.close()
+
 @app.route('/<int:out_id>/edit_out',methods=['GET','POST'])            
 def edit_out(out_id):
     
@@ -438,23 +581,31 @@ def edit_out(out_id):
     cur = conn.cursor()
     cur.execute('SELECT * FROM inventory_out WHERE out_id = %s',(out_id,))
     item = cur.fetchone()
-    
+    if not item:
+        cur.close()
+        conn.close()
+        return redirect(url_for('inventory_out'))
+
+    history_date = request.args.get('history_date') or request.form.get('history_date')
+
     if request.method =='POST':
         shipped_quantity = request.form.get('shipped_quantity')
         cur.execute('UPDATE inventory_out SET shipped_quantity = %s WHERE out_id=%s;',(shipped_quantity,out_id,))
         conn.commit()
         cur.close()
         conn.close()
+        if history_date and _parse_iso_date(history_date):
+            return redirect(url_for('inventory_out_history', date=history_date))
         return redirect(url_for('inventory_out'))
         
     cur.close()
     conn.close()
     
-    return render_template('edit_out.html', item=item)
+    return render_template('edit_out.html', item=item, history_date=history_date)
     
 @app.route('/<int:out_id>/delete',methods=['POST'])
 def delete_out(out_id):
-    
+    history_date = request.form.get('history_date')
     conn=get_db_connection()
     cur=conn.cursor()
     cur.execute('DELETE FROM inventory_out WHERE out_id = %s',(out_id,))
@@ -463,6 +614,8 @@ def delete_out(out_id):
     cur.close()
     conn.close()
     
+    if history_date and _parse_iso_date(history_date):
+        return redirect(url_for('inventory_out_history', date=history_date))
     return redirect(url_for('inventory_out'))
             
 
@@ -477,6 +630,50 @@ def get_product_names(group_name):
     cur.close()
     conn.close()    
     
+    return jsonify(product_names)
+
+
+@app.route('/api/group_names_by_category/<path:category>')
+def api_group_names_by_category(category):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT p.group_name
+        FROM products p
+        INNER JOIN group_by_counts g ON p.group_name = g.group_name
+        WHERE p.category_name = %s
+        GROUP BY p.group_name, g.group_no
+        ORDER BY g.group_no, p.group_name;
+        """,
+        (category,),
+    )
+    names = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return jsonify(names)
+
+
+@app.route('/get_product_names_for')
+def get_product_names_for():
+    category = (request.args.get('category') or '').strip()
+    group_name = (request.args.get('group_name') or '').strip()
+    if not category or not group_name:
+        return jsonify([])
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT product_name FROM products
+        WHERE category_name = %s AND group_name = %s
+        ORDER BY product_no, product_name;
+        """,
+        (category, group_name),
+    )
+    product_names = [row[0] for row in cur.fetchall()]
+    cur.close()
+    conn.close()
     return jsonify(product_names)
 
 
@@ -499,34 +696,44 @@ def api_get_stock(category):
         cur = conn.cursor()
     
         cur.execute('''
-            SELECT 
-                c.category_name, 
-                g.group_name, 
+            SELECT
+                c.category_name,
+                g.group_name,
+                g.values,
                 p.product_name,
-                (COALESCE(in_sums.total_in, 0) - COALESCE(out_sums.total_out, 0)) AS stock_count
+                CASE WHEN c.category_name = %s THEN
+                    COALESCE(in_sums.total_in, 0) * COALESCE(p.quantity_box, 1)
+                    - COALESCE(out_sums.total_out, 0)
+                ELSE
+                    (COALESCE(in_sums.total_in, 0) - COALESCE(out_sums.total_out, 0))
+                END AS stock_count
             FROM products AS p
             JOIN categories AS c ON p.category_name = c.category_name
             JOIN group_by_counts AS g ON p.group_name = g.group_name
-            
-            -- 入庫の合計
+
             LEFT JOIN (
                 SELECT product_name, SUM(received_quantity) AS total_in
                 FROM inventory_in
                 GROUP BY product_name
             ) AS in_sums ON p.product_name = in_sums.product_name
-            
-            -- 出庫の合計
+
             LEFT JOIN (
                 SELECT product_name, SUM(shipped_quantity) AS total_out
                 FROM inventory_out
                 GROUP BY product_name
             ) AS out_sums ON p.product_name = out_sums.product_name
-            
-            -- 指定されたカテゴリで絞り込み
+
             WHERE c.category_name = %s
-            AND (COALESCE(in_sums.total_in, 0) - COALESCE(out_sums.total_out, 0)) != 0
+            AND (
+                CASE WHEN c.category_name = %s THEN
+                    COALESCE(in_sums.total_in, 0) * COALESCE(p.quantity_box, 1)
+                    - COALESCE(out_sums.total_out, 0)
+                ELSE
+                    (COALESCE(in_sums.total_in, 0) - COALESCE(out_sums.total_out, 0))
+                END
+            ) != 0
             ORDER BY g.group_no;
-        ''', (category,))
+        ''', (POINT_PRIZE_CATEGORY, category, POINT_PRIZE_CATEGORY))
         
         rows = cur.fetchall()
         
@@ -534,8 +741,9 @@ def api_get_stock(category):
             {
                 "category": r[0],
                 "group": r[1],
-                "name": r[2],
-                "stock": float(r[3]) 
+                "point_value": float(r[2]) if r[2] is not None else None,
+                "name": r[3],
+                "stock": float(r[4])
             } for r in rows
         ]
         
@@ -583,46 +791,422 @@ def group_by_counts():
 
 
 # -----------------------------
-# 棚卸入力画面
+# 棚卸入力画面（カテゴリ別）
 # -----------------------------
 
-@app.route('/tobacco_check')
-def tobacco_check():
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute("""SELECT 
-    p.product_name, 
+_INVENTORY_CHECK_PRODUCTS_SQL = """
+SELECT
+    p.product_name,
     p.group_name,
     (COALESCE(i.total_in, 0) - COALESCE(o.total_out, 0)) * p.quantity_box AS db_stock
 FROM products p
 LEFT JOIN (
-    -- 先に入庫だけを合計する
-    SELECT product_name, group_name, SUM(received_quantity) as total_in 
+    SELECT product_name, group_name, SUM(received_quantity) AS total_in
     FROM inventory_in GROUP BY product_name, group_name
 ) i ON p.product_name = i.product_name AND p.group_name = i.group_name
 LEFT JOIN (
-    -- 先に出庫だけを合計する
-    SELECT product_name, group_name, SUM(shipped_quantity) as total_out 
+    SELECT product_name, group_name, SUM(shipped_quantity) AS total_out
     FROM inventory_out GROUP BY product_name, group_name
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
-WHERE p.category_name = 'たばこ'
-ORDER BY p.product_no; """)
+WHERE p.category_name = %s
+ORDER BY p.product_no;
+"""
+
+# ポイント景品: 商品別在庫 = 入庫×入り数 − 出庫（出庫は入り数を掛けない）をグループで合計
+_POINTS_STOCK_BY_GROUP_SQL = """
+SELECT
+    g.group_name,
+    SUM(
+        COALESCE(i.total_in, 0) * COALESCE(p.quantity_box, 1) - COALESCE(o.total_out, 0)
+    ) AS stock_total
+FROM products p
+INNER JOIN group_by_counts g ON p.group_name = g.group_name
+LEFT JOIN (
+    SELECT product_name, group_name, SUM(received_quantity) AS total_in
+    FROM inventory_in GROUP BY product_name, group_name
+) i ON p.product_name = i.product_name AND p.group_name = i.group_name
+LEFT JOIN (
+    SELECT product_name, group_name, SUM(shipped_quantity) AS total_out
+    FROM inventory_out GROUP BY product_name, group_name
+) o ON p.product_name = o.product_name AND p.group_name = o.group_name
+WHERE p.category_name = %s
+GROUP BY g.group_name, g.group_no
+ORDER BY g.group_no;
+"""
+
+_DB_STOCK_BY_GROUP_CATEGORY_SQL = """
+SELECT
+    g.group_name,
+    SUM((COALESCE(i.total_in, 0) - COALESCE(o.total_out, 0)) * p.quantity_box) AS db_stock
+FROM products p
+INNER JOIN group_by_counts g ON p.group_name = g.group_name
+LEFT JOIN (
+    SELECT product_name, group_name, SUM(received_quantity) AS total_in
+    FROM inventory_in GROUP BY product_name, group_name
+) i ON p.product_name = i.product_name AND p.group_name = i.group_name
+LEFT JOIN (
+    SELECT product_name, group_name, SUM(shipped_quantity) AS total_out
+    FROM inventory_out GROUP BY product_name, group_name
+) o ON p.product_name = o.product_name AND p.group_name = o.group_name
+WHERE p.category_name = %s
+GROUP BY g.group_name, g.group_no
+ORDER BY g.group_no;
+"""
+
+_USED_IN_OUT_PRODUCTS_SQL = """
+SELECT p.product_name, COALESCE(p.quantity_box, 1) AS quantity_box
+FROM products p
+WHERE p.category_name = %s AND p.group_name = %s
+AND (
+    EXISTS (
+        SELECT 1 FROM inventory_in i
+        WHERE i.product_name = p.product_name AND i.group_name = p.group_name
+    )
+    OR EXISTS (
+        SELECT 1 FROM inventory_out o
+        WHERE o.product_name = p.product_name AND o.group_name = p.group_name
+    )
+)
+ORDER BY p.product_no NULLS LAST, p.product_name;
+"""
+
+
+def _build_snack_drink_bootstrap():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    bootstrap = {}
+    try:
+        for cat in SNACK_DRINK_CATEGORIES:
+            cur.execute(_DB_STOCK_BY_GROUP_CATEGORY_SQL, (cat,))
+            rows = cur.fetchall()
+            groups = []
+            for row in rows:
+                gn = row[0]
+                db_s = row[1]
+                cur.execute(_USED_IN_OUT_PRODUCTS_SQL, (cat, gn))
+                products = [
+                    {
+                        "product_name": r[0],
+                        "quantity_box": int(r[1]) if r[1] is not None else 1,
+                    }
+                    for r in cur.fetchall()
+                ]
+                groups.append({
+                    "group_name": gn,
+                    "db_stock": float(db_s) if db_s is not None else 0.0,
+                    "products": products,
+                })
+            bootstrap[cat] = groups
+    finally:
+        cur.close()
+        conn.close()
+    return bootstrap
+
+
+def _tab_total_from_entry(entry):
+    if not entry:
+        return 0.0
+    db = float(entry.get("db_stock") or 0)
+    adj = 0.0
+    for line in entry.get("lines") or []:
+        mode = line.get("mode")
+        if mode == "product":
+            q = int(line.get("quantity") or 0)
+            box = int(line.get("quantity_box") or 1)
+            adj += q * box
+        elif mode == "mul":
+            adj += int(line.get("a") or 0) * int(line.get("b") or 0)
+        elif mode == "add":
+            adj += int(line.get("quantity") or 0)
+        elif line.get("product_name") and line.get("op") is not None:
+            # 旧形式（互換）
+            q = int(line.get("quantity") or 0)
+            if line.get("op") == "mul":
+                adj += 5 * q
+            else:
+                adj += q
+    return db + adj
+
+
+def _snack_drink_combined_rows(stored):
+    all_groups = set()
+    for cat in SNACK_DRINK_CATEGORIES:
+        cat_data = stored.get(cat) or {}
+        all_groups.update(cat_data.keys())
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT group_name FROM group_by_counts ORDER BY group_no;")
+    order = [r[0] for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+
+    ordered = [g for g in order if g in all_groups]
+    for g in all_groups:
+        if g not in ordered:
+            ordered.append(g)
+
+    rows = []
+    c0, c1 = SNACK_DRINK_CATEGORIES
+    for g in ordered:
+        e0 = (stored.get(c0) or {}).get(g)
+        e1 = (stored.get(c1) or {}).get(g)
+        t0 = _tab_total_from_entry(e0)
+        t1 = _tab_total_from_entry(e1)
+        rows.append({
+            "group_name": g,
+            "snack_total": t0,
+            "drink_total": t1,
+            "combined": t0 + t1,
+        })
+    return rows
+
+
+@app.route('/inventory_check')
+def inventory_check_menu():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT category_name FROM categories ORDER BY category_name;')
+    categories = [r[0] for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+    menu_categories = [c for c in categories if c not in SNACK_DRINK_CATEGORY_SET]
+    return render_template(
+        'inventory_check_select.html',
+        categories=menu_categories,
+        show_snack_drink_link=True,
+    )
+
+
+@app.route('/inventory_check/confirm', methods=['POST'])
+def inventory_check_confirm():
+    data = request.json
+    if not data or 'items' not in data or 'category_name' not in data:
+        return jsonify({"status": "error"}), 400
+    if data['category_name'] == POINT_PRIZE_CATEGORY:
+        return jsonify({"status": "error", "message": "ポイント景品は棚卸の保存対象外です"}), 400
+    if data['category_name'] in SNACK_DRINK_CATEGORY_SET:
+        return jsonify({
+            "status": "error",
+            "message": "端玉お菓子・ドリンクは専用の棚卸画面から入力してください",
+        }), 400
+    session['inventory_check_temp'] = data['items']
+    session['inventory_check_category'] = data['category_name']
+    return jsonify({"status": "ok"})
+
+
+@app.route('/inventory_check/result')
+def inventory_check_result():
+    temp_data = session.get('inventory_check_temp', [])
+    category_name = session.get('inventory_check_category', '')
+    if not temp_data:
+        return redirect(url_for('inventory_check_menu'))
+
+    summary_dict = {}
+    for item in temp_data:
+        g_name = item['group_name']
+        actual_val = (
+            int(item.get('in_shelf_count', 0)) +
+            int(item.get('unit_count', 0)) +
+            int(item.get('db_stock', 0))
+        )
+        if g_name not in summary_dict:
+            summary_dict[g_name] = 0
+        summary_dict[g_name] += actual_val
+
+    results = [[group, total] for group, total in summary_dict.items()]
+
+    return render_template(
+        'inventory_result.html',
+        category_name=category_name,
+        results=results
+    )
+
+
+@app.route('/inventory_check/final_save', methods=['POST'])
+def inventory_check_final_save():
+    temp_data = session.get('inventory_check_temp', [])
+    category_name = session.get('inventory_check_category', '')
+    pos_dict = request.json or {}
+
+    if not temp_data or not category_name:
+        return jsonify({"status": "error", "message": "セッションが無効です"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        for row in temp_data:
+            g_name = row['group_name']
+            group_pos = pos_dict.get(g_name, 0)
+            cur.execute("""
+                INSERT INTO inventory_check (
+                    category_name, product_name, group_name, in_shelf_count,
+                    unit_count, pos_stock, check_date
+                ) VALUES (%s, %s, %s, %s, %s, %s, CURRENT_DATE)
+            """, (
+                category_name,
+                row['product_name'], row['group_name'],
+                row['in_shelf_count'], row['unit_count'], group_pos
+            ))
+
+        conn.commit()
+        session.pop('inventory_check_temp', None)
+        session.pop('inventory_check_category', None)
+
+        return jsonify({"status": "ok"})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route('/inventory_check/snack_drink')
+def inventory_check_snack_drink():
+    bootstrap = _build_snack_drink_bootstrap()
+    return render_template(
+        'inventory_check_snack_drink.html',
+        bootstrap=bootstrap,
+        snack_drink_categories=list(SNACK_DRINK_CATEGORIES),
+        snack_label=SNACK_DRINK_CATEGORIES[0],
+        drink_label=SNACK_DRINK_CATEGORIES[1],
+    )
+
+
+@app.route('/inventory_check/snack_drink/confirm', methods=['POST'])
+def inventory_check_snack_drink_confirm():
+    data = request.json
+    if not data or not isinstance(data, dict):
+        return jsonify({"status": "error"}), 400
+    cleaned = {}
+    for cat in SNACK_DRINK_CATEGORIES:
+        cat_in = data.get(cat)
+        if not isinstance(cat_in, dict):
+            cleaned[cat] = {}
+            continue
+        cleaned[cat] = {}
+        for gname, entry in cat_in.items():
+            if not isinstance(entry, dict):
+                continue
+            lines = []
+            for line in entry.get("lines") or []:
+                if not isinstance(line, dict):
+                    continue
+                mode = line.get("mode")
+                if mode == "product":
+                    pn = line.get("product_name")
+                    if not pn:
+                        continue
+                    lines.append({
+                        "mode": "product",
+                        "product_name": pn,
+                        "quantity": int(line.get("quantity") or 0),
+                        "quantity_box": max(1, int(line.get("quantity_box") or 1)),
+                    })
+                elif mode == "mul":
+                    lines.append({
+                        "mode": "mul",
+                        "a": int(line.get("a") or 0),
+                        "b": int(line.get("b") or 0),
+                    })
+                elif mode == "add":
+                    lines.append({
+                        "mode": "add",
+                        "quantity": int(line.get("quantity") or 0),
+                    })
+            cleaned[cat][gname] = {
+                "db_stock": float(entry.get("db_stock") or 0),
+                "lines": lines,
+            }
+    session['snack_drink_inventory'] = cleaned
+    return jsonify({"status": "ok"})
+
+
+@app.route('/inventory_check/snack_drink/result')
+def inventory_check_snack_drink_result():
+    stored = session.get('snack_drink_inventory')
+    if not stored:
+        return redirect(url_for('inventory_check_snack_drink'))
+    rows = _snack_drink_combined_rows(stored)
+    return render_template(
+        'inventory_check_snack_drink_result.html',
+        rows=rows,
+        snack_label=SNACK_DRINK_CATEGORIES[0],
+        drink_label=SNACK_DRINK_CATEGORIES[1],
+    )
+
+
+@app.route("/inventory_check/history")
+def inventory_check_history():
+    raw = request.args.get("date") or _today_jst_iso()
+    view_date = _parse_iso_date(raw) or _parse_iso_date(_today_jst_iso())
+    date_str = view_date.isoformat()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT category_name, product_name, group_name,
+               in_shelf_count, unit_count, pos_stock, check_date
+        FROM inventory_check
+        WHERE check_date = %s
+        ORDER BY category_name, group_name, product_name;
+        """,
+        (view_date,),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template(
+        "inventory_check_history.html",
+        rows=rows,
+        selected_date=date_str,
+    )
+
+
+@app.route('/inventory_check/<category>')
+def inventory_check(category):
+    if category in SNACK_DRINK_CATEGORY_SET:
+        return redirect(url_for('inventory_check_snack_drink'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if category == POINT_PRIZE_CATEGORY:
+        cur.execute(_POINTS_STOCK_BY_GROUP_SQL, (category,))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        point_groups = [
+            {'group_name': r[0], 'stock_total': r[1]}
+            for r in rows
+        ]
+        return render_template(
+            'inventory_check_points.html',
+            category_name=category,
+            point_groups=point_groups
+        )
+
+    cur.execute(_INVENTORY_CHECK_PRODUCTS_SQL, (category,))
     db_products = cur.fetchall()
     cur.close()
     conn.close()
 
-    temp_data = session.get('tobacco_temp', [])
-    
+    temp_category = session.get('inventory_check_category')
+    if temp_category != category:
+        session.pop('inventory_check_temp', None)
+        session.pop('inventory_check_category', None)
+        temp_data = []
+    else:
+        temp_data = session.get('inventory_check_temp', [])
     temp_dict = {item['product_name']: item for item in temp_data}
 
     products_with_values = []
     for p in db_products:
         name = p[0]
-        
         in_shelf = temp_dict.get(name, {}).get('in_shelf_count', 0)
         unit_count = temp_dict.get(name, {}).get('unit_count', 0)
-        
         products_with_values.append({
             'product_name': p[0],
             'group_name': p[1],
@@ -631,74 +1215,38 @@ ORDER BY p.product_no; """)
             'unit_count': unit_count
         })
 
-    return render_template('tobacco_check.html', products=products_with_values)
+    return render_template(
+        'inventory_check.html',
+        category_name=category,
+        products=products_with_values
+    )
+
+
+@app.route('/tobacco_check')
+def tobacco_check():
+    return redirect(url_for('inventory_check', category='たばこ'))
+
 
 @app.route('/tobacco_check/confirm', methods=['POST'])
 def tobacco_check_confirm():
     data = request.json
     if not data:
         return jsonify({"status": "error"}), 400
-    session['tobacco_temp'] = data 
-    return jsonify({"status": "ok"})
+    if isinstance(data, list):
+        session['inventory_check_temp'] = data
+        session['inventory_check_category'] = 'たばこ'
+        return jsonify({"status": "ok"})
+    return jsonify({"status": "error"}), 400
 
 
 @app.route('/tobacco_result')
 def tobacco_result():
-    temp_data = session.get('tobacco_temp', [])
-    
+    return redirect(url_for('inventory_check_result'))
 
-    summary_dict = {} 
-    
-    for item in temp_data:
-        g_name = item['group_name']
-
-        actual_val = (
-            int(item.get('in_shelf_count', 0)) + 
-            int(item.get('unit_count', 0)) + 
-            int(item.get('db_stock', 0))
-        )
-        
-        if g_name not in summary_dict:
-            summary_dict[g_name] = 0
-        summary_dict[g_name] += actual_val
-
-    results = [[group, total] for group, total in summary_dict.items()]
-
-    return render_template('tobacco_result.html', results=results)
 
 @app.route('/tobacco_check/final_save', methods=['POST'])
 def tobacco_final_save():
-    temp_data = session.get('tobacco_temp', [])
-    pos_dict = request.json
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        for row in temp_data:
-            g_name = row['group_name']
-            group_pos = pos_dict.get(g_name, 0)
-            
-            cur.execute("""
-                INSERT INTO tobacco_inventory_check (
-                    product_name, group_name, in_shelf_count, 
-                    unit_count, pos_stock, check_date
-                ) VALUES (%s, %s, %s, %s, %s, CURRENT_DATE)
-            """, (
-                row['product_name'], row['group_name'], 
-                row['in_shelf_count'], row['unit_count'], group_pos
-            ))
-        
-        conn.commit()
-        session.pop('tobacco_temp', None) 
-        
-        return jsonify({"status": "ok"})
-        
-    except Exception as e:
-        conn.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
+    return inventory_check_final_save()
 
 # -----------------------------
 # 原価率計算と表示

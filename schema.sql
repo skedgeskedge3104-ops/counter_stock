@@ -6,7 +6,7 @@
 CREATE TABLE  IF NOT EXISTS group_by_counts (
     group_no SERIAL,
     group_name VARCHAR(16) PRIMARY KEY,
-    values NUMERIC(5,2),
+    values NUMERIC(5,2)
    );
 
 ALTER TABLE group_by_counts ALTER COLUMN values TYPE NUMERIC(6,2);
@@ -34,13 +34,30 @@ CREATE TABLE IF NOT EXISTS products (
 
 
 
-ALTER TABLE products
-ADD CONSTRAINT products_product_group_unique
-UNIQUE (product_name, group_name);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'products_product_group_unique'
+    ) THEN
+        ALTER TABLE products
+        ADD CONSTRAINT products_product_group_unique
+        UNIQUE (product_name, group_name);
+    END IF;
+END$$;
 
-ALTER TABLE products ADD COLUMN category_name VARCHAR(16) REFERENCES categories(category_name);
-
-ALTER TABLE products ALTER COLUMN unit_price TYPE NUMERIC (6,2);
+-- アプリが参照するカテゴリ（既存DBで欠けていると SQL が失敗する）
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'products'
+          AND column_name = 'category_name'
+    ) THEN
+        ALTER TABLE products ADD COLUMN category_name VARCHAR(16);
+    END IF;
+END$$;
 
 CREATE TABLE IF NOT EXISTS inventory_in (
     in_id SERIAL PRIMARY KEY,
@@ -63,8 +80,10 @@ CREATE TABLE IF NOT EXISTS inventory_out (
         REFERENCES products(product_name, group_name)
 );
 
-CREATE TABLE IF NOT EXISTS tobacco_inventory_check (
+CREATE TABLE IF NOT EXISTS inventory_check (
     check_id SERIAL PRIMARY KEY,
+    category_name VARCHAR(16) NOT NULL
+        REFERENCES categories(category_name),
     product_name VARCHAR(64) NOT NULL
         REFERENCES products(product_name),
     group_name VARCHAR(16) NOT NULL

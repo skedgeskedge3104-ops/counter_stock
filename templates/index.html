@@ -12,8 +12,11 @@
         MAIN MENU
     </h2><br><br>
     <a href="inventory_in">入庫</a>
+    <a href="{{ url_for('inventory_in_history') }}">入庫履歴</a>
     <a href="inventory_out">出庫</a>
-    <a href="tobacco_check">たばこ棚卸入力</a>
+    <a href="{{ url_for('inventory_out_history') }}">出庫履歴</a>
+    <a href="inventory_check">棚卸入力（カテゴリ選択）</a>
+    <a href="{{ url_for('inventory_check_history') }}">棚卸履歴</a>
     <a href="counter_stock">在庫一覧</a>
     <a href="register">登録各種</a>
     <a href="analysis">分析</a>
