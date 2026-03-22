@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}原価率計算{% endblock %}
+
+{% block content %}
+
+<h2>原価率計算</h2>
+<p>たばこ以外のカテゴリを対象にした原価率です。</p>
+<p><a href="{{ url_for('analysis_index') }}">分析メニューに戻る</a></p>
+
+<table class="cost-percentage">
+    <tr>
+        <th>全体原価率（入庫ベース）</th>
+    </tr>
+    <tr>
+        <td>{{ cost_percentage[0] if cost_percentage else '—' }}</td>
+    </tr>
+</table>
+
+<table class="cost-ratio-table">
+    <tr>
+        <th>商品名</th>
+        <th>原価率（単価/玉数）</th>
+    </tr>
+    {% for cost in costs %}
+    <tr>
+        <td>{{ cost[0] }}</td>
+        <td class="percentage">{{ cost[1] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

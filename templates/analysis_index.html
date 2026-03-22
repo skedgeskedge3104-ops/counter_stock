@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}分析{% endblock %}
+
+{% block content %}
+
+<h2>分析</h2>
+<p>メニューから項目を選んでください。</p>
+
+<ul style="list-style: none; padding: 0; max-width: 24rem; margin: 1.5rem auto;">
+    <li style="margin: 0.75rem 0;">
+        <a href="{{ url_for('analysis_cost_ratio') }}">原価率計算</a>
+    </li>
+    <li style="margin: 0.75rem 0;">
+        <a href="{{ url_for('analysis_outbound_forecast') }}">出庫予測</a>
+    </li>
+</ul>
+
+<p style="text-align: center;"><a href="{{ url_for('index') }}">メインメニューに戻る</a></p>
+
+{% endblock %}

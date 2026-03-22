@@ -55,6 +55,17 @@ def _parse_iso_date(s):
         return None
 
 
+def _add_calendar_months(d, delta):
+    """d は月の1日想定。delta ヶ月シフトした月の1日を返す。"""
+    mi = d.year * 12 + d.month - 1 + delta
+    return datetime.date(mi // 12, mi % 12 + 1, 1)
+
+
+def _jst_current_month_start():
+    now = datetime.datetime.now(pytz.timezone("Asia/Tokyo")).date()
+    return datetime.date(now.year, now.month, 1)
+
+
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
     
@@ -1249,42 +1260,181 @@ def tobacco_final_save():
     return inventory_check_final_save()
 
 # -----------------------------
-# 原価率計算と表示
+# 分析（ハブ・原価率・出庫予測）
 # -----------------------------
 
 
-@app.route('/analysis')
-def analysis():
+@app.route("/analysis")
+def analysis_index():
+    return render_template("analysis_index.html")
+
+
+@app.route("/analysis/cost_ratio")
+def analysis_cost_ratio():
     conn = get_db_connection()
     cur = conn.cursor()
-    
-    cur.execute('''SELECT
-        SUM(i.received_quantity * p.unit_price * p.quantity_box) / SUM(i.received_quantity * g.values * p.quantity_box) AS 原価率
+
+    cur.execute(
+        """SELECT
+        SUM(i.received_quantity * p.unit_price * p.quantity_box)
+            / NULLIF(SUM(i.received_quantity * g.values * p.quantity_box), 0) AS 原価率
         FROM inventory_in i
-        INNER JOIN products p
-        ON p.product_name = i.product_name
-        INNER JOIN group_by_counts g
-        ON g.group_name = p.group_name
+        INNER JOIN products p ON p.product_name = i.product_name
+        INNER JOIN group_by_counts g ON g.group_name = p.group_name
         WHERE p.category_name != 'たばこ';
-        ''')
-    
+        """
+    )
     cost_percentage = cur.fetchone()
-    
-    cur.execute('''SELECT p.product_name,  round(
-        COALESCE((p.unit_price / g.values), 0)::NUMERIC,2) AS 原価率 FROM products as p
-        INNER JOIN group_by_counts  AS g ON p.group_name = g.group_name
+
+    cur.execute(
+        """SELECT p.product_name, round(
+        COALESCE((p.unit_price / g.values), 0)::NUMERIC, 2) AS 原価率
+        FROM products AS p
+        INNER JOIN group_by_counts AS g ON p.group_name = g.group_name
         WHERE p.category_name != 'たばこ'
-        GROUP BY p.product_name,g.values,g.group_name
+        GROUP BY p.product_name, g.values, g.group_name
         ORDER BY 原価率 DESC;
-        ''')
-    
+        """
+    )
     costs = cur.fetchall()
-    
     cur.close()
     conn.close()
-    
-    
-    return render_template('analysis.html',cost_percentage=cost_percentage, costs=costs)
+    return render_template(
+        "analysis_cost_ratio.html",
+        cost_percentage=cost_percentage,
+        costs=costs,
+    )
+
+
+_OUTBOUND_BY_PRODUCT_SQL = """
+SELECT
+    p.category_name,
+    p.product_name,
+    (date_trunc('month', timezone('Asia/Tokyo', o.shipped_day)))::date AS ym,
+    SUM(
+        CASE WHEN p.category_name = %s
+        THEN o.shipped_quantity::numeric
+        ELSE (o.shipped_quantity * COALESCE(p.quantity_box, 1))::numeric
+        END
+    ) AS qty
+FROM inventory_out o
+INNER JOIN products p
+    ON p.product_name = o.product_name AND p.group_name = o.group_name
+WHERE p.category_name IN ('たばこ', 'ポイント景品')
+  AND date_trunc('month', timezone('Asia/Tokyo', o.shipped_day))
+      >= date_trunc('month', timezone('Asia/Tokyo', now())) - interval '36 months'
+GROUP BY p.category_name, p.product_name, ym
+ORDER BY p.category_name, p.product_name, ym;
+"""
+
+_OUTBOUND_SNACK_DRINK_BY_GROUP_SQL = """
+SELECT
+    p.group_name,
+    (date_trunc('month', timezone('Asia/Tokyo', o.shipped_day)))::date AS ym,
+    SUM((o.shipped_quantity * COALESCE(p.quantity_box, 1))::numeric) AS qty
+FROM inventory_out o
+INNER JOIN products p
+    ON p.product_name = o.product_name AND p.group_name = o.group_name
+WHERE p.category_name IN ('お菓子', 'ドリンク')
+  AND date_trunc('month', timezone('Asia/Tokyo', o.shipped_day))
+      >= date_trunc('month', timezone('Asia/Tokyo', now())) - interval '36 months'
+GROUP BY p.group_name, ym
+ORDER BY p.group_name, ym;
+"""
+
+
+def _month_label(d):
+    return f"{d.year}年{d.month}月"
+
+
+@app.route("/analysis/outbound_forecast")
+def analysis_outbound_forecast():
+    cur_m = _jst_current_month_start()
+    display_months = [_add_calendar_months(cur_m, -11 + i) for i in range(12)]
+    prev_year_month = _add_calendar_months(cur_m, -12)
+    prev_block_months = [_add_calendar_months(cur_m, -23 + i) for i in range(12)]
+    month_labels = [_month_label(m) for m in display_months]
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(_OUTBOUND_BY_PRODUCT_SQL, (POINT_PRIZE_CATEGORY,))
+    prod_rows = cur.fetchall()
+    cur.execute(_OUTBOUND_SNACK_DRINK_BY_GROUP_SQL)
+    group_rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    def norm_ym(v):
+        if v is None:
+            return None
+        if isinstance(v, datetime.datetime):
+            return datetime.date(v.year, v.month, 1)
+        if isinstance(v, datetime.date):
+            return datetime.date(v.year, v.month, 1)
+        return v
+
+    # たばこ / ポイント景品: (category, product) -> {ym: qty}
+    prod_map = {}
+    for cat, pname, ym, qty in prod_rows:
+        key = (cat, pname)
+        prod_map.setdefault(key, {})
+        prod_map[key][norm_ym(ym)] = float(qty or 0)
+
+    tobacco_rows = []
+    point_rows = []
+    for key in sorted(prod_map.keys()):
+        cat, pname = key
+        mq = prod_map[key]
+        vals = [mq.get(m, 0.0) for m in display_months]
+        if cat == "たばこ":
+            tobacco_rows.append({"product_name": pname, "months": vals})
+        else:
+            point_rows.append({"product_name": pname, "months": vals})
+
+    # お菓子+ドリンク: group -> {ym: qty}
+    grp_map = {}
+    for gname, ym, qty in group_rows:
+        grp_map.setdefault(gname, {})
+        grp_map[gname][norm_ym(ym)] = float(qty or 0)
+
+    snack_group_rows = []
+    for gname in sorted(grp_map.keys()):
+        mqty = grp_map[gname]
+        vals_12 = [mqty.get(m, 0.0) for m in display_months]
+        sum_12 = sum(vals_12)
+        avg_12 = sum_12 / 12.0 if display_months else 0.0
+        prev_y_val = mqty.get(prev_year_month, 0.0)
+        curr_val = vals_12[-1] if vals_12 else 0.0
+        if prev_y_val > 0:
+            yoy_pct = (curr_val / prev_y_val - 1.0) * 100.0
+        else:
+            yoy_pct = None
+        sum_prev = sum(mqty.get(m, 0.0) for m in prev_block_months)
+        if sum_prev > 0:
+            trend = sum_12 / sum_prev
+            pred = prev_y_val * trend
+        else:
+            trend = None
+            pred = avg_12 if avg_12 else None
+
+        snack_group_rows.append({
+            "group_name": gname,
+            "months": vals_12,
+            "avg_12": round(avg_12, 2),
+            "prev_year_same": round(prev_y_val, 2),
+            "yoy_pct": round(yoy_pct, 2) if yoy_pct is not None else None,
+            "prediction": round(pred, 2) if pred is not None else None,
+        })
+
+    return render_template(
+        "analysis_outbound_forecast.html",
+        month_labels=month_labels,
+        display_months=display_months,
+        tobacco_rows=tobacco_rows,
+        point_rows=point_rows,
+        snack_group_rows=snack_group_rows,
+        as_of_month=_month_label(cur_m),
+    )
 
 
 # -----------------------------

@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+
+{% block title %}出庫予測{% endblock %}
+
+{% block content %}
+
+<style>
+.af-section { margin: 2rem auto; max-width: 96%; }
+.af-scroll { overflow-x: auto; margin: 0.5rem 0; border: 1px solid #dee2e6; }
+.af-note { font-size: 0.9rem; color: #444; background: #f8f9fa; padding: 0.75rem; border-radius: 6px; margin: 0.5rem 0; }
+.af-table { border-collapse: collapse; font-size: 0.85rem; white-space: nowrap; }
+.af-table th, .af-table td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; text-align: right; }
+.af-table th:first-child, .af-table td:first-child { text-align: left; position: sticky; left: 0; background: #fff; z-index: 1; }
+.af-table thead th { background: #e9ecef; }
+</style>
+
+<h2>出庫予測</h2>
+<p>基準月（日本時間）: <strong>{{ as_of_month }}</strong> までのデータを使用しています。</p>
+<p><a href="{{ url_for('analysis_index') }}">分析メニューに戻る</a></p>
+
+<div class="af-note">
+    <strong>たばこ・ポイント景品:</strong> 出庫数は「たばこ＝出庫数量×入り数」、ポイント景品は在庫ロジックに合わせ<strong>出庫数量のみ</strong>（入り数は掛けません）。<br>
+    <strong>お菓子・ドリンク:</strong> カテゴリを合算し、GROUP 名（玉数）ごとに「出庫数量×入り数」を月次集計しています。<br>
+    <strong>前年度対比:</strong> 当月 ÷ 前年同月 − 1（%）。前年同月が 0 の場合は「—」。<br>
+    <strong>当月予測:</strong> 前年同月の出庫 ×（直近12ヶ月合計 ÷ その前の12ヶ月合計）。前12ヶ月合計が 0 の場合は直近12ヶ月平均を表示します。
+</div>
+
+<div class="af-section">
+    <h3>たばこ — 商品別・月次出庫数</h3>
+    <div class="af-scroll">
+        <table class="af-table">
+            <thead>
+                <tr>
+                    <th>商品名</th>
+                    {% for lb in month_labels %}
+                    <th>{{ lb }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in tobacco_rows %}
+                <tr>
+                    <td>{{ row.product_name }}</td>
+                    {% for v in row.months %}
+                    <td>{{ '%.2f'|format(v|float) }}</td>
+                    {% endfor %}
+                </tr>
+                {% else %}
+                <tr><td colspan="{{ month_labels|length + 1 }}">データがありません</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="af-section">
+    <h3>ポイント景品 — 商品別・月次出庫数</h3>
+    <div class="af-scroll">
+        <table class="af-table">
+            <thead>
+                <tr>
+                    <th>商品名</th>
+                    {% for lb in month_labels %}
+                    <th>{{ lb }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in point_rows %}
+                <tr>
+                    <td>{{ row.product_name }}</td>
+                    {% for v in row.months %}
+                    <td>{{ '%.2f'|format(v|float) }}</td>
+                    {% endfor %}
+                </tr>
+                {% else %}
+                <tr><td colspan="{{ month_labels|length + 1 }}">データがありません</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="af-section">
+    <h3>お菓子＋ドリンク（合算）— GROUP 名別</h3>
+    <div class="af-scroll">
+        <table class="af-table">
+            <thead>
+                <tr>
+                    <th>GROUP</th>
+                    {% for lb in month_labels %}
+                    <th>{{ lb }}</th>
+                    {% endfor %}
+                    <th>直近12ヶ月平均</th>
+                    <th>前年同月</th>
+                    <th>前年度対比(%)</th>
+                    <th>当月予測</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in snack_group_rows %}
+                <tr>
+                    <td>{{ row.group_name }}</td>
+                    {% for v in row.months %}
+                    <td>{{ '%.2f'|format(v|float) }}</td>
+                    {% endfor %}
+                    <td>{{ row.avg_12 }}</td>
+                    <td>{{ row.prev_year_same }}</td>
+                    <td>{% if row.yoy_pct is not none %}{{ row.yoy_pct }}{% else %}—{% endif %}</td>
+                    <td>{% if row.prediction is not none %}{{ row.prediction }}{% else %}—{% endif %}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="{{ month_labels|length + 5 }}">データがありません</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
