@@ -17,8 +17,8 @@ app.secret_key = "super-secret-key"
 # ポイント景品は在庫 = 入庫×入り数 − 出庫（出庫は入り数を掛けない）
 POINT_PRIZE_CATEGORY = "ポイント景品"
 
-# 端玉お菓子・ドリンク: タブ式入力し、GROUP 名で両カテゴリ合算表示
-SNACK_DRINK_CATEGORIES = ("端玉お菓子", "ドリンク")
+# お菓子・ドリンク: タブ式入力し、GROUP 名で両カテゴリ合算表示（一般棚卸一覧からは除外）
+SNACK_DRINK_CATEGORIES = ("お菓子", "ドリンク")
 SNACK_DRINK_CATEGORY_SET = frozenset(SNACK_DRINK_CATEGORIES)
 
 
@@ -988,7 +988,7 @@ def inventory_check_confirm():
     if data['category_name'] in SNACK_DRINK_CATEGORY_SET:
         return jsonify({
             "status": "error",
-            "message": "端玉お菓子・ドリンクは専用の棚卸画面から入力してください",
+            "message": "お菓子・ドリンクは専用の棚卸画面から入力してください",
         }), 400
     session['inventory_check_temp'] = data['items']
     session['inventory_check_category'] = data['category_name']
