@@ -1294,14 +1294,9 @@ def analysis_cost_ratio():
         INNER JOIN group_by_counts AS g ON p.group_name = g.group_name
         WHERE p.category_name IN %s
         GROUP BY p.category_name, p.product_name, g.values, g.group_name
-        ORDER BY CASE p.category_name WHEN %s THEN 0 WHEN %s THEN 1 ELSE 2 END,
-            p.product_name;
+        ORDER BY 原価率 DESC, p.product_name;
         """,
-        (
-            tuple(SNACK_DRINK_CATEGORIES),
-            SNACK_DRINK_CATEGORIES[0],
-            SNACK_DRINK_CATEGORIES[1],
-        ),
+        (tuple(SNACK_DRINK_CATEGORIES),),
     )
     costs = cur.fetchall()
     cur.close()
