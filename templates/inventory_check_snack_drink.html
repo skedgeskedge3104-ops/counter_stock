@@ -107,22 +107,23 @@ function productsFor(cat, groupName) {
 }
 
 function setModeFieldsVisible(tr) {
-    const mode = tr.querySelector(".mode-select").value;
+    const mode = tr.querySelector(".input-mode-select").value;
     tr.querySelectorAll(".mode-fields").forEach(el => {
         el.classList.toggle("visible", el.getAttribute("data-mode") === mode);
     });
 }
 
 function rowContrib(tr) {
-    const modeSel = tr.querySelector(".mode-select");
+    const modeSel = tr.querySelector(".input-mode-select");
     if (!modeSel) return 0;
+    const prodSel = tr.querySelector(".prod-select");
+    if (!prodSel || !prodSel.value) return 0;
     const mode = modeSel.value;
-    if (mode === "product") {
-        const sel = tr.querySelector(".prod-select");
-        const qtyInp = tr.querySelector(".qty-product");
-        if (!sel || !sel.value || !qtyInp) return 0;
+    if (mode === "box") {
+        const qtyInp = tr.querySelector(".qty-box");
+        if (!qtyInp) return 0;
         const qty = parseInt(qtyInp.value || "0", 10) || 0;
-        const opt = sel.selectedOptions[0];
+        const opt = prodSel.selectedOptions[0];
         const box = parseInt((opt && opt.dataset.quantityBox) || "1", 10) || 1;
         return qty * box;
     }
@@ -155,25 +156,6 @@ function addLineRow(panel) {
     tr.className = "line-row";
 
     const tdMode = document.createElement("td");
-    const modeSel = document.createElement("select");
-    modeSel.className = "mode-select";
-    [
-        ["product", "商品名（数量×入り数）"],
-        ["mul", "掛け算（2数の積）"],
-        ["add", "バラ（足し算）"]
-    ].forEach(([v, t]) => {
-        const o = document.createElement("option");
-        o.value = v;
-        o.textContent = t;
-        modeSel.appendChild(o);
-    });
-    tdMode.appendChild(modeSel);
-
-    const tdBody = document.createElement("td");
-
-    const wrapP = document.createElement("div");
-    wrapP.className = "mode-fields visible";
-    wrapP.setAttribute("data-mode", "product");
     const selP = document.createElement("select");
     selP.className = "prod-select";
     const o0 = document.createElement("option");
@@ -184,7 +166,7 @@ function addLineRow(panel) {
         const od = document.createElement("option");
         od.value = "";
         od.disabled = true;
-        od.textContent = "入出庫履歴のある商品がありません";
+        od.textContent = "pos-code 付き商品がありません";
         selP.appendChild(od);
     } else {
         products.forEach(p => {
@@ -195,15 +177,39 @@ function addLineRow(panel) {
             selP.appendChild(o);
         });
     }
+    const other = document.createElement("option");
+    other.value = "__other__";
+    other.textContent = "その他";
+    other.dataset.quantityBox = "1";
+    selP.appendChild(other);
+    tdMode.appendChild(selP);
+
+    const tdBody = document.createElement("td");
+    const inputModeSel = document.createElement("select");
+    inputModeSel.className = "input-mode-select";
+    [
+        ["box", "箱数（数量×入り数）"],
+        ["mul", "掛け算（2数の積）"],
+        ["add", "足し算（数量）"]
+    ].forEach(([v, t]) => {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = t;
+        inputModeSel.appendChild(o);
+    });
+    tdBody.appendChild(inputModeSel);
+
+    const wrapP = document.createElement("div");
+    wrapP.className = "mode-fields visible";
+    wrapP.setAttribute("data-mode", "box");
     const lab1 = document.createElement("span");
     lab1.textContent = " 数量（箱・単位の個数）: ";
     const qtyP = document.createElement("input");
     qtyP.type = "number";
-    qtyP.className = "num-inp qty-product";
+    qtyP.className = "num-inp qty-box";
     qtyP.min = "0";
     qtyP.step = "1";
     qtyP.value = "0";
-    wrapP.appendChild(selP);
     wrapP.appendChild(lab1);
     wrapP.appendChild(qtyP);
     const hintP = document.createElement("div");
@@ -262,7 +268,7 @@ function addLineRow(panel) {
     tr.appendChild(tdDel);
 
     const bindRecalc = () => recalcPanel(panel);
-    modeSel.addEventListener("change", () => {
+    inputModeSel.addEventListener("change", () => {
         setModeFieldsVisible(tr);
         bindRecalc();
     });
@@ -317,16 +323,16 @@ function collectPayload() {
             const db = parseFloat(panel.dataset.db || "0") || 0;
             const lines = [];
             panel.querySelectorAll(".line-row").forEach(tr => {
-                const mode = tr.querySelector(".mode-select").value;
-                if (mode === "product") {
-                    const sel = tr.querySelector(".prod-select");
-                    if (!sel.value) return;
+                const mode = tr.querySelector(".input-mode-select").value;
+                const sel = tr.querySelector(".prod-select");
+                if (!sel || !sel.value) return;
+                if (mode === "box") {
                     const opt = sel.selectedOptions[0];
                     const box = parseInt((opt && opt.dataset.quantityBox) || "1", 10) || 1;
                     lines.push({
                         mode: "product",
                         product_name: sel.value,
-                        quantity: parseInt(tr.querySelector(".qty-product").value || "0", 10) || 0,
+                        quantity: parseInt(tr.querySelector(".qty-box").value || "0", 10) || 0,
                         quantity_box: box
                     });
                 } else if (mode === "mul") {
@@ -349,24 +355,32 @@ function collectPayload() {
 }
 
 function setRowModeAndValues(panel, tr, line) {
-    const modeSel = tr.querySelector(".mode-select");
+    const modeSel = tr.querySelector(".input-mode-select");
     if (!modeSel) return;
-    modeSel.value = line.mode || "product";
-    setModeFieldsVisible(tr);
+    const sel = tr.querySelector(".prod-select");
+    if (sel && line.product_name) {
+        if ([...sel.options].some(o => o.value === line.product_name)) {
+            sel.value = line.product_name;
+        } else {
+            sel.value = "__other__";
+        }
+    }
     if (line.mode === "product") {
-        const sel = tr.querySelector(".prod-select");
-        const qty = tr.querySelector(".qty-product");
-        if (sel && line.product_name) sel.value = line.product_name;
+        modeSel.value = "box";
+        const qty = tr.querySelector(".qty-box");
         if (qty) qty.value = String(line.quantity || 0);
     } else if (line.mode === "mul") {
+        modeSel.value = "mul";
         const a = tr.querySelector(".mul-a");
         const b = tr.querySelector(".mul-b");
         if (a) a.value = String(line.a || 0);
         if (b) b.value = String(line.b || 0);
     } else if (line.mode === "add") {
+        modeSel.value = "add";
         const qtyA = tr.querySelector(".qty-add");
         if (qtyA) qtyA.value = String(line.quantity || 0);
     }
+    setModeFieldsVisible(tr);
     recalcPanel(panel);
 }
 

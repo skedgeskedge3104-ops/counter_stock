@@ -1048,6 +1048,7 @@ SELECT p.product_name, COALESCE(p.quantity_box, 1) AS quantity_box
 FROM products p
 WHERE p.category_name = %s AND p.group_name = %s
 AND COALESCE(p.display, TRUE) = TRUE
+AND p.pos_code IS NOT NULL
 AND (
     EXISTS (
         SELECT 1 FROM inventory_in i
@@ -1058,7 +1059,7 @@ AND (
         WHERE o.product_name = p.product_name AND o.group_name = p.group_name
     )
 )
-ORDER BY p.product_no NULLS LAST, p.product_name;
+ORDER BY p.pos_code, p.product_name;
 """
 
 
