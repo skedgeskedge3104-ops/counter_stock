@@ -20,6 +20,7 @@ CREATE TABLE  IF NOT EXISTS shops (
 CREATE TABLE IF NOT EXISTS products (
     product_no SERIAL,
     product_id VARCHAR(32),
+    pos_code INTEGER,
     maker VARCHAR(32),
     shop_name VARCHAR(16)
         REFERENCES shops(shop_name),
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS products (
     product_name VARCHAR(64) PRIMARY KEY,
     quantity_box INTEGER,
     unit_price NUMERIC(5,2),
+    display BOOLEAN NOT NULL DEFAULT TRUE,
     expiry_date TIMESTAMP
 );
 
@@ -43,6 +45,32 @@ BEGIN
         ALTER TABLE products
         ADD CONSTRAINT products_product_group_unique
         UNIQUE (product_name, group_name);
+    END IF;
+END$$;
+
+-- 既存DB向け: products.pos_code がなければ追加
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'products'
+          AND column_name = 'pos_code'
+    ) THEN
+        ALTER TABLE products ADD COLUMN pos_code INTEGER;
+    END IF;
+END$$;
+
+-- 既存DB向け: products.display がなければ追加
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'products'
+          AND column_name = 'display'
+    ) THEN
+        ALTER TABLE products ADD COLUMN display BOOLEAN NOT NULL DEFAULT TRUE;
     END IF;
 END$$;
 
@@ -99,4 +127,24 @@ CREATE TABLE IF NOT EXISTS inventory_check (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     UNIQUE (product_name, group_name, check_date)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_check_drafts (
+    draft_key VARCHAR(64) PRIMARY KEY,
+    payload TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inventory_check_results (
+    result_id SERIAL PRIMARY KEY,
+    category_name VARCHAR(16) NOT NULL
+        REFERENCES categories(category_name),
+    pos_code INTEGER,
+    group_name VARCHAR(16) NOT NULL
+        REFERENCES group_by_counts(group_name),
+    product_name VARCHAR(64) NOT NULL,
+    db_stock_count INTEGER NOT NULL,
+    counted_stock_count INTEGER NOT NULL,
+    check_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

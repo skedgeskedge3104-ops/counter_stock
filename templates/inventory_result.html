@@ -4,53 +4,39 @@
 
 {% block content %}
 
-<h2>{{ category_name }} 棚卸結果（GROUP別・本日）</h2>
+<h2>{{ category_name }} 棚卸結果（本日）</h2>
 
 <p><a href="{{ url_for('inventory_check', category=category_name) }}">入力に戻る</a>
    · <a href="{{ url_for('inventory_check_menu') }}">カテゴリ選択</a></p>
 
 <table border="1" id="resultTable">
     <tr>
-        <th>グループ</th>
-        <th>実地合計</th>
-        <th>POS在庫</th>
-        <th>差異</th>
+        <th>POS-code</th>
+        <th>GROUP</th>
+        <th>商品名</th>
+        <th>DB在庫(個数)</th>
+        <th>数えた個数</th>
     </tr>
     {% for r in results %}
-    <tr class="group-row">
-        <td class="group_name">{{ r[0] }}</td>
-        <td class="actual">{{ r[1] }}</td>
-        <td><input type="number" class="pos_input" oninput="calcDiff(this)" value="0"
-           onfocus="if(this.value=='0')this.value='';"
-           onblur="if(this.value=='')this.value='0';"></td>
-        <td class="diff">{{ r[1] }}</td>
+    <tr>
+        <td>{{ r.pos_code if r.pos_code is not none else '—' }}</td>
+        <td>{{ r.group_name }}</td>
+        <td>{{ r.product_name }}</td>
+        <td>{{ r.db_stock }}</td>
+        <td>{{ r.counted_count }}</td>
     </tr>
     {% endfor %}
 </table>
 
 <br>
-<button type="button" id="saveBtn">確定（DBへ保存する）</button>
+<button type="button" id="saveBtn">登録</button>
 
 <script>
-function calcDiff(input) {
-    const row = input.closest("tr");
-    const actual = Number(row.querySelector(".actual").textContent);
-    const pos = Number(input.value || 0);
-    row.querySelector(".diff").textContent = actual - pos;
-}
-
 document.getElementById("saveBtn").addEventListener("click", () => {
-    const posData = {};
-    document.querySelectorAll(".group-row").forEach(row => {
-        const group = row.querySelector(".group_name").textContent;
-        const pos = Number(row.querySelector(".pos_input").value);
-        posData[group] = pos;
-    });
-
     fetch("{{ url_for('inventory_check_final_save') }}", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(posData)
+        body: JSON.stringify({})
     })
     .then(res => res.json())
     .then(data => {

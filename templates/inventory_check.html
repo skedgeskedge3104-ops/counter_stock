@@ -37,12 +37,15 @@
 
 <br>
 <button type="button" id="confirmBtn">次へ（グループ別集計へ）</button>
+<button type="button" id="draftBtn">仮保存</button>
 
 <script>
 const categoryName = {{ category_name | tojson }};
-document.getElementById("confirmBtn").addEventListener("click", () => {
+const draftSaveUrl = {{ url_for('inventory_check_draft_save') | tojson }};
+
+function collectRows() {
     const rows = document.querySelectorAll("#inventoryTable tr:not(:first-child)");
-    const finalData = Array.from(rows).map(row => {
+    return Array.from(rows).map(row => {
         return {
             product_name: row.querySelector(".product_name").value,
             group_name: row.querySelector(".group_name").value,
@@ -51,6 +54,10 @@ document.getElementById("confirmBtn").addEventListener("click", () => {
             unit_count: Number(row.querySelector(".unit_count").value)
         };
     });
+}
+
+document.getElementById("confirmBtn").addEventListener("click", () => {
+    const finalData = collectRows();
 
     fetch("{{ url_for('inventory_check_confirm') }}", {
         method: "POST",
@@ -64,6 +71,24 @@ document.getElementById("confirmBtn").addEventListener("click", () => {
         }
     })
     .catch(() => alert("送信エラーが発生しました"));
+});
+
+document.getElementById("draftBtn").addEventListener("click", () => {
+    const finalData = collectRows();
+    fetch(draftSaveUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category_name: categoryName, items: finalData })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === "ok") {
+            alert("仮保存しました");
+        } else {
+            alert(data.message || "仮保存に失敗しました");
+        }
+    })
+    .catch(() => alert("仮保存の送信エラーが発生しました"));
 });
 </script>
 {% endblock %}

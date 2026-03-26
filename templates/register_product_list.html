@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}登録商品一覧{% endblock %}
+
+{% block content %}
+
+<div class="menu-container" style="text-align: center;">
+    <h2>登録商品一覧</h2>
+    <form method="get" style="margin-bottom: 1em;">
+        <label for="category_name">カテゴリー選択</label><br>
+        <select name="category_name" id="category_name" onchange="this.form.submit()">
+            {% for c_name in categories %}
+            <option value="{{ c_name }}" {% if c_name == selected_category %}selected{% endif %}>{{ c_name }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <table border="1" style="margin: 0 auto;">
+        <thead>
+            <tr>
+                <th>商品名</th>
+                <th>玉数</th>
+                <th>pos_code</th>
+                <th>display</th>
+                <th>更新</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in products %}
+            <tr>
+                <td>{{ p[0] }}</td>
+                <td>{{ p[1] }}</td>
+                <td>
+                    <input type="number" name="pos_code" form="row-form-{{ loop.index0 }}"
+                        value="{{ p[2] if p[2] is not none else '' }}">
+                </td>
+                <td>
+                    <input type="checkbox" name="display" form="row-form-{{ loop.index0 }}"
+                        {% if p[3] %}checked{% endif %}>
+                </td>
+                <td>
+                    <form id="row-form-{{ loop.index0 }}" method="post">
+                        <input type="hidden" name="category_name" value="{{ selected_category }}">
+                        <input type="hidden" name="product_name" value="{{ p[0] }}">
+                        <button type="submit">保存</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5">該当カテゴリの商品がありません</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <br>
+    <a href="{{ url_for('register') }}">登録メニューに戻る</a>
+</div>
+
+{% endblock %}

@@ -37,6 +37,30 @@
     </tbody>
 </table>
 
+<div style="margin-top: 1.25rem;">
+    <button type="button" id="saveBtn">登録</button>
+</div>
+
+<script>
+document.getElementById("saveBtn").addEventListener("click", () => {
+    fetch("{{ url_for('inventory_check_snack_drink_final_save') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === "ok") {
+            alert("棚卸データを保存しました");
+            window.location.href = "{{ url_for('index') }}";
+        } else {
+            alert(data.message || "保存に失敗しました");
+        }
+    })
+    .catch(() => alert("送信エラーが発生しました"));
+});
+</script>
+
 <p style="margin-top: 1.5rem;"><a href="{{ url_for('index') }}">メニューに戻る</a></p>
 
 {% endblock %}

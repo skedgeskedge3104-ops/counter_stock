@@ -88,6 +88,7 @@
 {% endfor %}
 
 <div class="sd-actions">
+    <button type="button" id="sdDraftBtn">仮保存</button>
     <button type="button" id="sdSubmitBtn">集計結果へ</button>
 </div>
 
@@ -95,7 +96,9 @@
 const BOOTSTRAP = {{ bootstrap | tojson }};
 const CATEGORIES = {{ snack_drink_categories | tojson }};
 const URL_CONFIRM = {{ url_for('inventory_check_snack_drink_confirm') | tojson }};
+const URL_DRAFT_SAVE = {{ url_for('inventory_check_snack_drink_draft_save') | tojson }};
 const URL_RESULT = {{ url_for('inventory_check_snack_drink_result') | tojson }};
+const DRAFT_DATA = {{ draft_data | tojson }};
 
 function productsFor(cat, groupName) {
     const groups = BOOTSTRAP[cat] || [];
@@ -345,6 +348,54 @@ function collectPayload() {
     return out;
 }
 
+function setRowModeAndValues(panel, tr, line) {
+    const modeSel = tr.querySelector(".mode-select");
+    if (!modeSel) return;
+    modeSel.value = line.mode || "product";
+    setModeFieldsVisible(tr);
+    if (line.mode === "product") {
+        const sel = tr.querySelector(".prod-select");
+        const qty = tr.querySelector(".qty-product");
+        if (sel && line.product_name) sel.value = line.product_name;
+        if (qty) qty.value = String(line.quantity || 0);
+    } else if (line.mode === "mul") {
+        const a = tr.querySelector(".mul-a");
+        const b = tr.querySelector(".mul-b");
+        if (a) a.value = String(line.a || 0);
+        if (b) b.value = String(line.b || 0);
+    } else if (line.mode === "add") {
+        const qtyA = tr.querySelector(".qty-add");
+        if (qtyA) qtyA.value = String(line.quantity || 0);
+    }
+    recalcPanel(panel);
+}
+
+function applyDraftData() {
+    if (!DRAFT_DATA || typeof DRAFT_DATA !== "object") return;
+    document.querySelectorAll(".sd-cat").forEach(section => {
+        const cat = section.dataset.category;
+        const catDraft = DRAFT_DATA[cat];
+        if (!catDraft || typeof catDraft !== "object") return;
+        section.querySelectorAll(".sd-panel").forEach(panel => {
+            const groupName = panel.dataset.group;
+            const groupDraft = catDraft[groupName];
+            if (!groupDraft || !Array.isArray(groupDraft.lines)) return;
+            const tbody = panel.querySelector(".lines-tbody");
+            if (tbody) tbody.innerHTML = "";
+            groupDraft.lines.forEach(line => {
+                addLineRow(panel);
+                const rows = panel.querySelectorAll(".line-row");
+                const tr = rows[rows.length - 1];
+                setRowModeAndValues(panel, tr, line);
+            });
+            if (groupDraft.lines.length === 0) {
+                addLineRow(panel);
+            }
+            recalcPanel(panel);
+        });
+    });
+}
+
 document.getElementById("sdSubmitBtn").addEventListener("click", () => {
     const body = collectPayload();
     fetch(URL_CONFIRM, {
@@ -362,6 +413,26 @@ document.getElementById("sdSubmitBtn").addEventListener("click", () => {
     })
     .catch(() => alert("通信エラー"));
 });
+
+document.getElementById("sdDraftBtn").addEventListener("click", () => {
+    const body = collectPayload();
+    fetch(URL_DRAFT_SAVE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === "ok") {
+            alert("仮保存しました");
+        } else {
+            alert("仮保存に失敗しました");
+        }
+    })
+    .catch(() => alert("通信エラー"));
+});
+
+applyDraftData();
 </script>
 
 <p style="text-align:center;margin-top:1rem;"><a href="{{ url_for('index') }}">メニューに戻る</a></p>

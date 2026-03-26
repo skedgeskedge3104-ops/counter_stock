@@ -5,7 +5,7 @@
 {% block content %}
 
 <h2>棚卸結果の履歴</h2>
-<p>日本時間（Asia/Tokyo）の日付で、DB に保存された棚卸（<code>inventory_check</code>）を表示します。</p>
+<p>日本時間（Asia/Tokyo）の日付で、DB に保存された棚卸集計結果（<code>inventory_check_results</code>）を表示します。</p>
 
 <form method="get" action="{{ url_for('inventory_check_history') }}" style="margin: 1rem 0;">
     <label for="hist_date">日付</label>
@@ -25,11 +25,11 @@
     <thead>
         <tr>
             <th>カテゴリ</th>
+            <th>POS-code</th>
             <th>GROUP</th>
             <th>商品名</th>
-            <th>棚(in_shelf)</th>
-            <th>バラ(unit)</th>
-            <th>POS</th>
+            <th>DB在庫(個数)</th>
+            <th>数えた個数</th>
             <th>計上日</th>
         </tr>
     </thead>
@@ -37,8 +37,8 @@
         {% for r in rows %}
         <tr>
             <td>{{ r[0] }}</td>
+            <td>{{ r[1] if r[1] is not none else '—' }}</td>
             <td>{{ r[2] }}</td>
-            <td>{{ r[1] }}</td>
             <td>{{ r[3] }}</td>
             <td>{{ r[4] }}</td>
             <td>{{ r[5] }}</td>

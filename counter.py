@@ -4,6 +4,7 @@ from flask import Flask, render_template,request,redirect,url_for,jsonify,sessio
 from io import TextIOWrapper
 import csv
 import datetime
+import json
 import pytz
 
 
@@ -124,6 +125,64 @@ def get_db_connection():
         )
         
     return conn 
+
+
+def _draft_key_for_category(category_name):
+    return f"inventory_check:{category_name}"
+
+
+def _load_inventory_draft(draft_key):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT payload
+            FROM inventory_check_drafts
+            WHERE draft_key = %s;
+            """,
+            (draft_key,),
+        )
+        row = cur.fetchone()
+        if not row or not row[0]:
+            return None
+        return json.loads(row[0])
+    except Exception:
+        return None
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _save_inventory_draft(draft_key, payload_obj):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            INSERT INTO inventory_check_drafts (draft_key, payload, updated_at)
+            VALUES (%s, %s, timezone('Asia/Tokyo', now()))
+            ON CONFLICT (draft_key) DO UPDATE
+            SET payload = EXCLUDED.payload,
+                updated_at = timezone('Asia/Tokyo', now());
+            """,
+            (draft_key, json.dumps(payload_obj, ensure_ascii=False)),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _delete_inventory_draft(draft_key):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM inventory_check_drafts WHERE draft_key = %s;", (draft_key,))
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
     
 @app.route('/')
 def index():
@@ -319,6 +378,77 @@ def register_product():
             return f'error:{e}'
         
     return render_template('register_product.html')
+
+
+@app.route('/register_product_list', methods=['GET', 'POST'])
+def register_product_list():
+    selected_category = (request.args.get('category_name') or '').strip()
+
+    if request.method == 'POST':
+        selected_category = (request.form.get('category_name') or '').strip()
+        product_name = request.form.get('product_name')
+        pos_code_raw = (request.form.get('pos_code') or '').strip()
+        display = request.form.get('display') == 'on'
+
+        pos_code = int(pos_code_raw) if pos_code_raw else None
+
+        conn = None
+        cur = None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE products
+                SET pos_code = %s, display = %s
+                WHERE product_name = %s;
+                """,
+                (pos_code, display, product_name),
+            )
+            conn.commit()
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            return f'error:{e}'
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+
+        return redirect(url_for('register_product_list', category_name=selected_category))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute('SELECT category_name FROM categories ORDER BY category_name;')
+    categories = [row[0] for row in cur.fetchall()]
+
+    if not selected_category and categories:
+        selected_category = categories[0]
+
+    products = []
+    if selected_category:
+        cur.execute(
+            """
+            SELECT product_name, group_name, pos_code, display
+            FROM products
+            WHERE category_name = %s
+            ORDER BY product_name;
+            """,
+            (selected_category,),
+        )
+        products = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        'register_product_list.html',
+        categories=categories,
+        selected_category=selected_category,
+        products=products,
+    )
 
 
 # -----------------------------
@@ -635,7 +765,15 @@ def get_product_names(group_name):
     conn = get_db_connection()
     cur = conn.cursor()
     
-    cur.execute('SELECT product_name FROM products WHERE group_name = %s;',(group_name,))
+    cur.execute(
+        """
+        SELECT product_name
+        FROM products
+        WHERE group_name = %s
+          AND COALESCE(display, TRUE) = TRUE;
+        """,
+        (group_name,),
+    )
     product_names = [row[0] for row in cur.fetchall()]
     
     cur.close()
@@ -654,6 +792,7 @@ def api_group_names_by_category(category):
         FROM products p
         INNER JOIN group_by_counts g ON p.group_name = g.group_name
         WHERE p.category_name = %s
+          AND COALESCE(p.display, TRUE) = TRUE
         GROUP BY p.group_name, g.group_no
         ORDER BY g.group_no, p.group_name;
         """,
@@ -678,6 +817,7 @@ def get_product_names_for():
         """
         SELECT product_name FROM products
         WHERE category_name = %s AND group_name = %s
+          AND COALESCE(display, TRUE) = TRUE
         ORDER BY product_no, product_name;
         """,
         (category, group_name),
@@ -820,6 +960,7 @@ LEFT JOIN (
     FROM inventory_out GROUP BY product_name, group_name
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
 WHERE p.category_name = %s
+  AND COALESCE(p.display, TRUE) = TRUE
 ORDER BY p.product_no;
 """
 
@@ -841,6 +982,7 @@ LEFT JOIN (
     FROM inventory_out GROUP BY product_name, group_name
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
 WHERE p.category_name = %s
+  AND COALESCE(p.display, TRUE) = TRUE
 GROUP BY g.group_name, g.group_no
 ORDER BY g.group_no;
 """
@@ -860,6 +1002,7 @@ LEFT JOIN (
     FROM inventory_out GROUP BY product_name, group_name
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
 WHERE p.category_name = %s
+  AND COALESCE(p.display, TRUE) = TRUE
 GROUP BY g.group_name, g.group_no
 ORDER BY g.group_no;
 """
@@ -868,6 +1011,7 @@ _USED_IN_OUT_PRODUCTS_SQL = """
 SELECT p.product_name, COALESCE(p.quantity_box, 1) AS quantity_box
 FROM products p
 WHERE p.category_name = %s AND p.group_name = %s
+AND COALESCE(p.display, TRUE) = TRUE
 AND (
     EXISTS (
         SELECT 1 FROM inventory_in i
@@ -880,6 +1024,112 @@ AND (
 )
 ORDER BY p.product_no NULLS LAST, p.product_name;
 """
+
+
+def _build_inventory_check_result_rows(category_name, temp_data):
+    if not temp_data:
+        return []
+
+    product_names = sorted({
+        str(item.get("product_name"))
+        for item in temp_data
+        if item.get("product_name")
+    })
+    if not product_names:
+        return []
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT product_name, group_name, pos_code
+            FROM products
+            WHERE category_name = %s
+              AND product_name = ANY(%s);
+            """,
+            (category_name, product_names),
+        )
+        meta = {r[0]: {"group_name": r[1], "pos_code": r[2]} for r in cur.fetchall()}
+    finally:
+        cur.close()
+        conn.close()
+
+    grouped = {}
+    for item in temp_data:
+        product_name = str(item.get("product_name") or "")
+        if not product_name:
+            continue
+        m = meta.get(product_name, {})
+        group_name = str(item.get("group_name") or m.get("group_name") or "")
+        if not group_name:
+            continue
+        pos_code = m.get("pos_code")
+        db_stock = int(item.get("db_stock") or 0)
+        counted = db_stock + int(item.get("in_shelf_count") or 0) + int(item.get("unit_count") or 0)
+        if pos_code is None:
+            key = (None, group_name, "その他")
+        else:
+            key = (int(pos_code), group_name, product_name)
+        if key not in grouped:
+            grouped[key] = {"db_stock": 0, "counted_count": 0}
+        grouped[key]["db_stock"] += db_stock
+        grouped[key]["counted_count"] += counted
+
+    rows = []
+    for key, vals in grouped.items():
+        pos_code, group_name, product_name = key
+        rows.append({
+            "pos_code": pos_code,
+            "group_name": group_name,
+            "product_name": product_name,
+            "db_stock": vals["db_stock"],
+            "counted_count": vals["counted_count"],
+        })
+    rows.sort(
+        key=lambda r: (
+            r["group_name"],
+            1 if r["pos_code"] is None else 0,
+            r["pos_code"] if r["pos_code"] is not None else 0,
+            r["product_name"],
+        )
+    )
+    return rows
+
+
+def _build_snack_drink_result_rows(stored):
+    rows = []
+    for cat in SNACK_DRINK_CATEGORIES:
+        cat_entries = stored.get(cat) if isinstance(stored, dict) else {}
+        if not isinstance(cat_entries, dict):
+            continue
+        for group_name, entry in cat_entries.items():
+            if not isinstance(entry, dict):
+                continue
+            db_stock = int(float(entry.get("db_stock") or 0))
+            added = 0
+            for line in entry.get("lines") or []:
+                if not isinstance(line, dict):
+                    continue
+                mode = line.get("mode")
+                if mode == "product":
+                    qty = int(line.get("quantity") or 0)
+                    qbox = max(1, int(line.get("quantity_box") or 1))
+                    added += qty * qbox
+                elif mode == "mul":
+                    added += int(line.get("a") or 0) * int(line.get("b") or 0)
+                elif mode == "add":
+                    added += int(line.get("quantity") or 0)
+            rows.append({
+                "category_name": cat,
+                "pos_code": None,
+                "group_name": str(group_name),
+                "product_name": "その他",
+                "db_stock": db_stock,
+                "counted_count": db_stock + added,
+            })
+    rows.sort(key=lambda r: (r["category_name"], r["group_name"], r["product_name"]))
+    return rows
 
 
 def _build_snack_drink_bootstrap():
@@ -1006,26 +1256,48 @@ def inventory_check_confirm():
     return jsonify({"status": "ok"})
 
 
+@app.route('/inventory_check/draft_save', methods=['POST'])
+def inventory_check_draft_save():
+    data = request.json or {}
+    items = data.get('items')
+    category_name = (data.get('category_name') or '').strip()
+    if not isinstance(items, list) or not category_name:
+        return jsonify({"status": "error", "message": "入力データが不正です"}), 400
+    if category_name == POINT_PRIZE_CATEGORY:
+        return jsonify({"status": "error", "message": "ポイント景品は仮保存対象外です"}), 400
+    if category_name in SNACK_DRINK_CATEGORY_SET:
+        return jsonify({"status": "error", "message": "専用画面から仮保存してください"}), 400
+
+    cleaned_items = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        product_name = item.get('product_name')
+        group_name = item.get('group_name')
+        if not product_name or not group_name:
+            continue
+        cleaned_items.append({
+            'product_name': str(product_name),
+            'group_name': str(group_name),
+            'db_stock': int(item.get('db_stock') or 0),
+            'in_shelf_count': int(item.get('in_shelf_count') or 0),
+            'unit_count': int(item.get('unit_count') or 0),
+        })
+
+    _save_inventory_draft(
+        _draft_key_for_category(category_name),
+        {"category_name": category_name, "items": cleaned_items},
+    )
+    return jsonify({"status": "ok"})
+
+
 @app.route('/inventory_check/result')
 def inventory_check_result():
     temp_data = session.get('inventory_check_temp', [])
     category_name = session.get('inventory_check_category', '')
     if not temp_data:
         return redirect(url_for('inventory_check_menu'))
-
-    summary_dict = {}
-    for item in temp_data:
-        g_name = item['group_name']
-        actual_val = (
-            int(item.get('in_shelf_count', 0)) +
-            int(item.get('unit_count', 0)) +
-            int(item.get('db_stock', 0))
-        )
-        if g_name not in summary_dict:
-            summary_dict[g_name] = 0
-        summary_dict[g_name] += actual_val
-
-    results = [[group, total] for group, total in summary_dict.items()]
+    results = _build_inventory_check_result_rows(category_name, temp_data)
 
     return render_template(
         'inventory_result.html',
@@ -1038,31 +1310,33 @@ def inventory_check_result():
 def inventory_check_final_save():
     temp_data = session.get('inventory_check_temp', [])
     category_name = session.get('inventory_check_category', '')
-    pos_dict = request.json or {}
 
     if not temp_data or not category_name:
         return jsonify({"status": "error", "message": "セッションが無効です"}), 400
 
+    result_rows = _build_inventory_check_result_rows(category_name, temp_data)
+    if not result_rows:
+        return jsonify({"status": "error", "message": "保存対象の集計結果がありません"}), 400
+
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        for row in temp_data:
-            g_name = row['group_name']
-            group_pos = pos_dict.get(g_name, 0)
+        for row in result_rows:
             cur.execute("""
-                INSERT INTO inventory_check (
-                    category_name, product_name, group_name, in_shelf_count,
-                    unit_count, pos_stock, check_date
+                INSERT INTO inventory_check_results (
+                    category_name, pos_code, group_name, product_name,
+                    db_stock_count, counted_stock_count, check_date
                 ) VALUES (%s, %s, %s, %s, %s, %s, CURRENT_DATE)
             """, (
                 category_name,
-                row['product_name'], row['group_name'],
-                row['in_shelf_count'], row['unit_count'], group_pos
+                row['pos_code'], row['group_name'], row['product_name'],
+                row['db_stock'], row['counted_count']
             ))
 
         conn.commit()
         session.pop('inventory_check_temp', None)
         session.pop('inventory_check_category', None)
+        _delete_inventory_draft(_draft_key_for_category(category_name))
 
         return jsonify({"status": "ok"})
 
@@ -1077,9 +1351,11 @@ def inventory_check_final_save():
 @app.route('/inventory_check/snack_drink')
 def inventory_check_snack_drink():
     bootstrap = _build_snack_drink_bootstrap()
+    draft_data = _load_inventory_draft('inventory_check:snack_drink') or {}
     return render_template(
         'inventory_check_snack_drink.html',
         bootstrap=bootstrap,
+        draft_data=draft_data,
         snack_drink_categories=list(SNACK_DRINK_CATEGORIES),
         snack_label=SNACK_DRINK_CATEGORIES[0],
         drink_label=SNACK_DRINK_CATEGORIES[1],
@@ -1135,6 +1411,57 @@ def inventory_check_snack_drink_confirm():
     return jsonify({"status": "ok"})
 
 
+@app.route('/inventory_check/snack_drink/draft_save', methods=['POST'])
+def inventory_check_snack_drink_draft_save():
+    data = request.json
+    if not data or not isinstance(data, dict):
+        return jsonify({"status": "error"}), 400
+
+    cleaned = {}
+    for cat in SNACK_DRINK_CATEGORIES:
+        cat_in = data.get(cat)
+        if not isinstance(cat_in, dict):
+            cleaned[cat] = {}
+            continue
+        cleaned[cat] = {}
+        for gname, entry in cat_in.items():
+            if not isinstance(entry, dict):
+                continue
+            lines = []
+            for line in entry.get("lines") or []:
+                if not isinstance(line, dict):
+                    continue
+                mode = line.get("mode")
+                if mode == "product":
+                    pn = line.get("product_name")
+                    if not pn:
+                        continue
+                    lines.append({
+                        "mode": "product",
+                        "product_name": pn,
+                        "quantity": int(line.get("quantity") or 0),
+                        "quantity_box": max(1, int(line.get("quantity_box") or 1)),
+                    })
+                elif mode == "mul":
+                    lines.append({
+                        "mode": "mul",
+                        "a": int(line.get("a") or 0),
+                        "b": int(line.get("b") or 0),
+                    })
+                elif mode == "add":
+                    lines.append({
+                        "mode": "add",
+                        "quantity": int(line.get("quantity") or 0),
+                    })
+            cleaned[cat][gname] = {
+                "db_stock": float(entry.get("db_stock") or 0),
+                "lines": lines,
+            }
+
+    _save_inventory_draft('inventory_check:snack_drink', cleaned)
+    return jsonify({"status": "ok"})
+
+
 @app.route('/inventory_check/snack_drink/result')
 def inventory_check_snack_drink_result():
     stored = session.get('snack_drink_inventory')
@@ -1149,6 +1476,48 @@ def inventory_check_snack_drink_result():
     )
 
 
+@app.route('/inventory_check/snack_drink/final_save', methods=['POST'])
+def inventory_check_snack_drink_final_save():
+    stored = session.get('snack_drink_inventory')
+    if not stored:
+        return jsonify({"status": "error", "message": "セッションが無効です"}), 400
+
+    result_rows = _build_snack_drink_result_rows(stored)
+    if not result_rows:
+        return jsonify({"status": "error", "message": "保存対象の集計結果がありません"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        for row in result_rows:
+            cur.execute(
+                """
+                INSERT INTO inventory_check_results (
+                    category_name, pos_code, group_name, product_name,
+                    db_stock_count, counted_stock_count, check_date
+                ) VALUES (%s, %s, %s, %s, %s, %s, CURRENT_DATE)
+                """,
+                (
+                    row["category_name"],
+                    row["pos_code"],
+                    row["group_name"],
+                    row["product_name"],
+                    row["db_stock"],
+                    row["counted_count"],
+                ),
+            )
+        conn.commit()
+        session.pop('snack_drink_inventory', None)
+        _delete_inventory_draft('inventory_check:snack_drink')
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
 @app.route("/inventory_check/history")
 def inventory_check_history():
     raw = request.args.get("date") or _today_jst_iso()
@@ -1158,11 +1527,13 @@ def inventory_check_history():
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT category_name, product_name, group_name,
-               in_shelf_count, unit_count, pos_stock, check_date
-        FROM inventory_check
+        SELECT category_name, pos_code, group_name, product_name,
+               db_stock_count, counted_stock_count, check_date
+        FROM inventory_check_results
         WHERE check_date = %s
-        ORDER BY category_name, group_name, product_name;
+        ORDER BY category_name, group_name,
+                 CASE WHEN pos_code IS NULL THEN 1 ELSE 0 END,
+                 pos_code, product_name;
         """,
         (view_date,),
     )
@@ -1208,7 +1579,8 @@ def inventory_check(category):
     if temp_category != category:
         session.pop('inventory_check_temp', None)
         session.pop('inventory_check_category', None)
-        temp_data = []
+        draft_obj = _load_inventory_draft(_draft_key_for_category(category)) or {}
+        temp_data = draft_obj.get('items', []) if isinstance(draft_obj, dict) else []
     else:
         temp_data = session.get('inventory_check_temp', [])
     temp_dict = {item['product_name']: item for item in temp_data}
