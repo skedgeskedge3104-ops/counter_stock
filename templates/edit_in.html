@@ -10,6 +10,9 @@
     {% if history_date %}
     <input type="hidden" name="history_date" value="{{ history_date }}">
     {% endif %}
+    {% if history_product_name is defined %}
+    <input type="hidden" name="history_product_name" value="{{ history_product_name }}">
+    {% endif %}
     <table style="width: auto; text-align: center; margin: 1rem auto;">
         <thead>
             <tr>
@@ -36,7 +39,7 @@
 
 <p style="text-align:center;">
     {% if history_date %}
-    <a href="{{ url_for('inventory_in_history', date=history_date) }}">履歴に戻る</a>
+    <a href="{{ url_for('inventory_in_history', date=history_date, product_name=history_product_name) }}">履歴に戻る</a>
     {% else %}
     <a href="{{ url_for('inventory_in') }}">入庫に戻る</a>
     {% endif %}

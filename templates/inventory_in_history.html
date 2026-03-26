@@ -10,6 +10,8 @@
 <form method="get" action="{{ url_for('inventory_in_history') }}" style="margin: 1rem 0;">
     <label for="in_date">日付</label>
     <input type="date" id="in_date" name="date" value="{{ selected_date }}" required>
+    <label for="in_product_name" style="margin-left: 1rem;">商品名</label>
+    <input type="text" id="in_product_name" name="product_name" value="{{ product_name or '' }}" placeholder="部分一致">
     <button type="submit">表示</button>
 </form>
 
@@ -39,11 +41,12 @@
             <td>{{ item[3] }}</td>
             <td>{{ item[4]|ts_display }}</td>
             <td>
-                <form action="{{ url_for('edit_in', in_id=item[0], history_date=selected_date) }}" method="get" style="display:inline;">
+                <form action="{{ url_for('edit_in', in_id=item[0], history_date=selected_date, history_product_name=product_name) }}" method="get" style="display:inline;">
                     <button type="submit" class="btn-compact-action">編集</button>
                 </form>
                 <form action="{{ url_for('delete_in', in_id=item[0]) }}" method="post" style="display:inline;" onsubmit="return confirm('削除しますか？');">
                     <input type="hidden" name="history_date" value="{{ selected_date }}">
+                    <input type="hidden" name="history_product_name" value="{{ product_name or '' }}">
                     <button type="submit" class="btn-compact-action">削除</button>
                 </form>
             </td>
