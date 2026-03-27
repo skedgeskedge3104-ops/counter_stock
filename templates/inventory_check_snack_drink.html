@@ -148,6 +148,15 @@ function recalcPanel(panel) {
     if (span) span.textContent = String(db + adj);
 }
 
+function bindZeroHideBehavior(inputEl) {
+    inputEl.addEventListener("focus", () => {
+        if (inputEl.value === "0") inputEl.value = "";
+    });
+    inputEl.addEventListener("blur", () => {
+        if (inputEl.value === "") inputEl.value = "0";
+    });
+}
+
 function addLineRow(panel) {
     const cat = panel.closest(".sd-cat").dataset.category;
     const groupName = panel.dataset.group;
@@ -210,6 +219,7 @@ function addLineRow(panel) {
     qtyP.min = "0";
     qtyP.step = "1";
     qtyP.value = "0";
+    bindZeroHideBehavior(qtyP);
     wrapP.appendChild(lab1);
     wrapP.appendChild(qtyP);
     const hintP = document.createElement("div");
@@ -227,6 +237,7 @@ function addLineRow(panel) {
     ma.className = "mul-inp mul-a";
     ma.step = "1";
     ma.value = "0";
+    bindZeroHideBehavior(ma);
     const mx = document.createElement("span");
     mx.textContent = " × ";
     const mb = document.createElement("input");
@@ -234,6 +245,7 @@ function addLineRow(panel) {
     mb.className = "mul-inp mul-b";
     mb.step = "1";
     mb.value = "0";
+    bindZeroHideBehavior(mb);
     mulRow.appendChild(ma);
     mulRow.appendChild(mx);
     mulRow.appendChild(mb);
@@ -249,6 +261,7 @@ function addLineRow(panel) {
     qtyA.className = "num-inp qty-add";
     qtyA.step = "1";
     qtyA.value = "0";
+    bindZeroHideBehavior(qtyA);
     wrapA.appendChild(labA);
     wrapA.appendChild(qtyA);
 

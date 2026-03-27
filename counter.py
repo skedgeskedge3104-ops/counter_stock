@@ -1103,7 +1103,7 @@ def _build_inventory_check_result_rows(category_name, temp_data):
             continue
         pos_code = m.get("pos_code")
         db_stock = int(item.get("db_stock") or 0)
-        counted = db_stock + int(item.get("in_shelf_count") or 0) + int(item.get("unit_count") or 0)
+        counted = int(item.get("in_shelf_count") or 0) + int(item.get("unit_count") or 0)
         if pos_code is None:
             key = (None, group_name, "その他")
         else:
@@ -1122,6 +1122,7 @@ def _build_inventory_check_result_rows(category_name, temp_data):
             "product_name": product_name,
             "db_stock": vals["db_stock"],
             "counted_count": vals["counted_count"],
+            "total_count": vals["db_stock"] + vals["counted_count"],
         })
     rows.sort(
         key=lambda r: (
@@ -1163,7 +1164,8 @@ def _build_snack_drink_result_rows(stored):
                 "group_name": str(group_name),
                 "product_name": "その他",
                 "db_stock": db_stock,
-                "counted_count": db_stock + added,
+                "counted_count": added,
+                "total_count": db_stock + added,
             })
     rows.sort(key=lambda r: (r["category_name"], r["group_name"], r["product_name"]))
     return rows
@@ -1504,7 +1506,7 @@ def inventory_check_snack_drink_result():
     stored = session.get('snack_drink_inventory')
     if not stored:
         return redirect(url_for('inventory_check_snack_drink'))
-    rows = _snack_drink_combined_rows(stored)
+    rows = _build_snack_drink_result_rows(stored)
     return render_template(
         'inventory_check_snack_drink_result.html',
         rows=rows,

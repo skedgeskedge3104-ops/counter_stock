@@ -16,6 +16,7 @@
         <th>商品名</th>
         <th>DB在庫(個数)</th>
         <th>数えた個数</th>
+        <th>合計</th>
     </tr>
     {% for r in results %}
     <tr>
@@ -24,6 +25,7 @@
         <td>{{ r.product_name }}</td>
         <td>{{ r.db_stock }}</td>
         <td>{{ r.counted_count }}</td>
+        <td>{{ r.total_count }}</td>
     </tr>
     {% endfor %}
 </table>

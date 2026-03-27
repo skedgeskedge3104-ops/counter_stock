@@ -43,7 +43,7 @@ function loadStock(category) {
     const title = document.getElementById('currentCategoryTitle');
     const colGroupLabel = document.getElementById('colGroupLabel');
 
-    colGroupLabel.textContent = category === 'ポイント景品' ? 'ポイント数' : '玉数';
+    colGroupLabel.textContent = category === 'ポイント景品' ? 'グループ名' : '玉数';
 
     // タイトルの更新
     title.textContent = `表示中: ${category}`;
@@ -67,9 +67,7 @@ function loadStock(category) {
             // 取得したデータをループしてテーブルを作成
             data.forEach(item => {
                 const row = document.createElement('tr');
-                const col1 = (category === 'ポイント景品' && item.point_value != null)
-                    ? item.point_value
-                    : item.group;
+                const col1 = item.group;
                 row.innerHTML = `
                     <td>${col1}</td>
                     <td>${item.name}</td>
