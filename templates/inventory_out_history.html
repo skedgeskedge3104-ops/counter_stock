@@ -20,8 +20,10 @@
     · <a href="{{ url_for('index') }}">メインメニュー</a>
 </p>
 
-{% if rows|length == 0 %}
-<p>この日付の出庫はありません。</p>
+{% if not has_filter %}
+<p>日付または商品名を指定して「表示」を押してください。</p>
+{% elif rows|length == 0 %}
+<p>該当する出庫履歴はありません。</p>
 {% else %}
 <table border="1" style="border-collapse: collapse; width: 90%; margin: 1rem auto; text-align: center;">
     <thead>

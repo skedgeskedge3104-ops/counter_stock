@@ -462,26 +462,30 @@ def inventory_in_history():
     product_query = (request.args.get("product_name") or "").strip()
     view_date = _parse_iso_date(raw)
     date_str = view_date.isoformat() if view_date else raw
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT in_id, product_name, group_name, received_quantity, received_day
-        FROM inventory_in
-        WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', received_day)) = %s)
-          AND (%s = '' OR product_name ILIKE ('%%' || %s || '%%'))
-        ORDER BY received_day DESC, in_id;
-        """,
-        (view_date, view_date, product_query, product_query),
-    )
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    has_filter = bool(view_date) or bool(product_query)
+    rows = []
+    if has_filter:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT in_id, product_name, group_name, received_quantity, received_day
+            FROM inventory_in
+            WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', received_day)) = %s)
+              AND (%s = '' OR product_name ILIKE ('%%' || %s || '%%'))
+            ORDER BY received_day DESC, in_id;
+            """,
+            (view_date, view_date, product_query, product_query),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
     return render_template(
         "inventory_in_history.html",
         rows=rows,
         selected_date=date_str,
         product_name=product_query,
+        has_filter=has_filter,
     )
 
 
@@ -672,26 +676,30 @@ def inventory_out_history():
     product_query = (request.args.get("product_name") or "").strip()
     view_date = _parse_iso_date(raw)
     date_str = view_date.isoformat() if view_date else raw
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT out_id, product_name, group_name, shipped_quantity, shipped_day
-        FROM inventory_out
-        WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', shipped_day)) = %s)
-          AND (%s = '' OR product_name ILIKE ('%%' || %s || '%%'))
-        ORDER BY shipped_day DESC, out_id;
-        """,
-        (view_date, view_date, product_query, product_query),
-    )
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    has_filter = bool(view_date) or bool(product_query)
+    rows = []
+    if has_filter:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT out_id, product_name, group_name, shipped_quantity, shipped_day
+            FROM inventory_out
+            WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', shipped_day)) = %s)
+              AND (%s = '' OR product_name ILIKE ('%%' || %s || '%%'))
+            ORDER BY shipped_day DESC, out_id;
+            """,
+            (view_date, view_date, product_query, product_query),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
     return render_template(
         "inventory_out_history.html",
         rows=rows,
         selected_date=date_str,
         product_name=product_query,
+        has_filter=has_filter,
     )
 
 
