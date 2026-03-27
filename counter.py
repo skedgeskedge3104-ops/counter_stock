@@ -1136,38 +1136,124 @@ def _build_inventory_check_result_rows(category_name, temp_data):
 
 
 def _build_snack_drink_result_rows(stored):
-    rows = []
+    if not isinstance(stored, dict):
+        return []
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT
+                p.category_name,
+                p.group_name,
+                p.product_name,
+                p.pos_code,
+                ((COALESCE(i.total_in, 0) - COALESCE(o.total_out, 0)) * COALESCE(p.quantity_box, 1))::integer AS db_stock
+            FROM products p
+            LEFT JOIN (
+                SELECT product_name, group_name, SUM(received_quantity) AS total_in
+                FROM inventory_in GROUP BY product_name, group_name
+            ) i ON p.product_name = i.product_name AND p.group_name = i.group_name
+            LEFT JOIN (
+                SELECT product_name, group_name, SUM(shipped_quantity) AS total_out
+                FROM inventory_out GROUP BY product_name, group_name
+            ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
+            WHERE p.category_name IN %s
+              AND COALESCE(p.display, TRUE) = TRUE
+            ORDER BY p.category_name, p.group_name, p.pos_code NULLS LAST, p.product_name;
+            """,
+            (tuple(SNACK_DRINK_CATEGORIES),),
+        )
+        db_rows = cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+    meta = {}
+    pos_products = []
+    non_pos_db_by_group = {}
+    for cat, gname, pname, pos_code, db_stock in db_rows:
+        key = (cat, gname, pname)
+        meta[key] = {"pos_code": pos_code, "db_stock": int(db_stock or 0)}
+        if pos_code is None:
+            gp_key = (cat, gname)
+            non_pos_db_by_group[gp_key] = non_pos_db_by_group.get(gp_key, 0) + int(db_stock or 0)
+        else:
+            pos_products.append((cat, gname, pname, int(pos_code), int(db_stock or 0)))
+
+    counted_by_product = {}
+    counted_other_by_group = {}
     for cat in SNACK_DRINK_CATEGORIES:
-        cat_entries = stored.get(cat) if isinstance(stored, dict) else {}
+        cat_entries = stored.get(cat)
         if not isinstance(cat_entries, dict):
             continue
-        for group_name, entry in cat_entries.items():
+        for gname, entry in cat_entries.items():
             if not isinstance(entry, dict):
                 continue
-            db_stock = int(float(entry.get("db_stock") or 0))
-            added = 0
             for line in entry.get("lines") or []:
                 if not isinstance(line, dict):
                     continue
                 mode = line.get("mode")
                 if mode == "product":
-                    qty = int(line.get("quantity") or 0)
-                    qbox = max(1, int(line.get("quantity_box") or 1))
-                    added += qty * qbox
+                    contrib = int(line.get("quantity") or 0) * max(1, int(line.get("quantity_box") or 1))
                 elif mode == "mul":
-                    added += int(line.get("a") or 0) * int(line.get("b") or 0)
+                    contrib = int(line.get("a") or 0) * int(line.get("b") or 0)
                 elif mode == "add":
-                    added += int(line.get("quantity") or 0)
-            rows.append({
-                "category_name": cat,
-                "pos_code": None,
-                "group_name": str(group_name),
-                "product_name": "その他",
-                "db_stock": db_stock,
-                "counted_count": added,
-                "total_count": db_stock + added,
-            })
-    rows.sort(key=lambda r: (r["category_name"], r["group_name"], r["product_name"]))
+                    contrib = int(line.get("quantity") or 0)
+                else:
+                    continue
+
+                pname = str(line.get("product_name") or "")
+                if not pname or pname == "__other__":
+                    og_key = (cat, str(gname))
+                    counted_other_by_group[og_key] = counted_other_by_group.get(og_key, 0) + contrib
+                    continue
+
+                p_key = (cat, str(gname), pname)
+                m = meta.get(p_key)
+                if not m or m.get("pos_code") is None:
+                    og_key = (cat, str(gname))
+                    counted_other_by_group[og_key] = counted_other_by_group.get(og_key, 0) + contrib
+                else:
+                    counted_by_product[p_key] = counted_by_product.get(p_key, 0) + contrib
+
+    rows = []
+    for cat, gname, pname, pos_code, db_stock in pos_products:
+        counted = counted_by_product.get((cat, gname, pname), 0)
+        rows.append({
+            "category_name": cat,
+            "pos_code": pos_code,
+            "group_name": gname,
+            "product_name": pname,
+            "db_stock": db_stock,
+            "counted_count": counted,
+            "total_count": db_stock + counted,
+        })
+
+    target_groups = set(non_pos_db_by_group.keys()) | set(counted_other_by_group.keys())
+    for cat, gname in target_groups:
+        db_stock = non_pos_db_by_group.get((cat, gname), 0)
+        counted = counted_other_by_group.get((cat, gname), 0)
+        rows.append({
+            "category_name": cat,
+            "pos_code": None,
+            "group_name": gname,
+            "product_name": "その他",
+            "db_stock": db_stock,
+            "counted_count": counted,
+            "total_count": db_stock + counted,
+        })
+
+    rows.sort(
+        key=lambda r: (
+            1 if r["pos_code"] is None else 0,
+            r["pos_code"] if r["pos_code"] is not None else 0,
+            r["group_name"],
+            r["category_name"],
+            r["product_name"],
+        )
+    )
     return rows
 
 
@@ -1434,12 +1520,14 @@ def inventory_check_snack_drink_confirm():
                 elif mode == "mul":
                     lines.append({
                         "mode": "mul",
+                        "product_name": str(line.get("product_name") or ""),
                         "a": int(line.get("a") or 0),
                         "b": int(line.get("b") or 0),
                     })
                 elif mode == "add":
                     lines.append({
                         "mode": "add",
+                        "product_name": str(line.get("product_name") or ""),
                         "quantity": int(line.get("quantity") or 0),
                     })
             cleaned[cat][gname] = {
@@ -1484,12 +1572,14 @@ def inventory_check_snack_drink_draft_save():
                 elif mode == "mul":
                     lines.append({
                         "mode": "mul",
+                        "product_name": str(line.get("product_name") or ""),
                         "a": int(line.get("a") or 0),
                         "b": int(line.get("b") or 0),
                     })
                 elif mode == "add":
                     lines.append({
                         "mode": "add",
+                        "product_name": str(line.get("product_name") or ""),
                         "quantity": int(line.get("quantity") or 0),
                     })
             cleaned[cat][gname] = {

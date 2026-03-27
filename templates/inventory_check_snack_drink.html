@@ -351,12 +351,14 @@ function collectPayload() {
                 } else if (mode === "mul") {
                     lines.push({
                         mode: "mul",
+                        product_name: sel.value,
                         a: parseInt(tr.querySelector(".mul-a").value || "0", 10) || 0,
                         b: parseInt(tr.querySelector(".mul-b").value || "0", 10) || 0
                     });
                 } else if (mode === "add") {
                     lines.push({
                         mode: "add",
+                        product_name: sel.value,
                         quantity: parseInt(tr.querySelector(".qty-add").value || "0", 10) || 0
                     });
                 }
