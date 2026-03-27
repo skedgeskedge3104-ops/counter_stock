@@ -1116,13 +1116,16 @@ def _build_inventory_check_result_rows(category_name, temp_data):
     rows = []
     for key, vals in grouped.items():
         pos_code, group_name, product_name = key
+        total_count = vals["db_stock"] + vals["counted_count"]
+        if total_count == 0:
+            continue
         rows.append({
             "pos_code": pos_code,
             "group_name": group_name,
             "product_name": product_name,
             "db_stock": vals["db_stock"],
             "counted_count": vals["counted_count"],
-            "total_count": vals["db_stock"] + vals["counted_count"],
+            "total_count": total_count,
         })
     rows.sort(
         key=lambda r: (
@@ -1221,6 +1224,9 @@ def _build_snack_drink_result_rows(stored):
     rows = []
     for cat, gname, pname, pos_code, db_stock in pos_products:
         counted = counted_by_product.get((cat, gname, pname), 0)
+        total_count = db_stock + counted
+        if total_count == 0:
+            continue
         rows.append({
             "category_name": cat,
             "pos_code": pos_code,
@@ -1228,13 +1234,16 @@ def _build_snack_drink_result_rows(stored):
             "product_name": pname,
             "db_stock": db_stock,
             "counted_count": counted,
-            "total_count": db_stock + counted,
+            "total_count": total_count,
         })
 
     target_groups = set(non_pos_db_by_group.keys()) | set(counted_other_by_group.keys())
     for cat, gname in target_groups:
         db_stock = non_pos_db_by_group.get((cat, gname), 0)
         counted = counted_other_by_group.get((cat, gname), 0)
+        total_count = db_stock + counted
+        if total_count == 0:
+            continue
         rows.append({
             "category_name": cat,
             "pos_code": None,
@@ -1242,7 +1251,7 @@ def _build_snack_drink_result_rows(stored):
             "product_name": "その他",
             "db_stock": db_stock,
             "counted_count": counted,
-            "total_count": db_stock + counted,
+            "total_count": total_count,
         })
 
     rows.sort(
