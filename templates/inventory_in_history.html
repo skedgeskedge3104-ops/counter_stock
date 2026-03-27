@@ -9,7 +9,7 @@
 
 <form method="get" action="{{ url_for('inventory_in_history') }}" style="margin: 1rem 0;">
     <label for="in_date">日付</label>
-    <input type="date" id="in_date" name="date" value="{{ selected_date }}" required>
+    <input type="date" id="in_date" name="date" value="{{ selected_date }}">
     <label for="in_product_name" style="margin-left: 1rem;">商品名</label>
     <input type="text" id="in_product_name" name="product_name" value="{{ product_name or '' }}" placeholder="部分一致">
     <button type="submit">表示</button>

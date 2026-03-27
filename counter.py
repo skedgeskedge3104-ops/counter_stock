@@ -458,21 +458,21 @@ def register_product_list():
 
 @app.route('/inventory_in/history')
 def inventory_in_history():
-    raw = request.args.get("date") or _today_jst_iso()
+    raw = (request.args.get("date") or "").strip()
     product_query = (request.args.get("product_name") or "").strip()
-    view_date = _parse_iso_date(raw) or _parse_iso_date(_today_jst_iso())
-    date_str = view_date.isoformat()
+    view_date = _parse_iso_date(raw)
+    date_str = view_date.isoformat() if view_date else raw
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
         """
         SELECT in_id, product_name, group_name, received_quantity, received_day
         FROM inventory_in
-        WHERE DATE(timezone('Asia/Tokyo', received_day)) = %s
+        WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', received_day)) = %s)
           AND (%s = '' OR product_name ILIKE ('%%' || %s || '%%'))
         ORDER BY received_day DESC, in_id;
         """,
-        (view_date, product_query, product_query),
+        (view_date, view_date, product_query, product_query),
     )
     rows = cur.fetchall()
     cur.close()
@@ -507,12 +507,14 @@ def edit_in(in_id):
         conn.commit()
         cur.close()
         conn.close()
-        if history_date and _parse_iso_date(history_date):
-            return redirect(url_for(
-                "inventory_in_history",
-                date=history_date,
-                product_name=history_product_name or "",
-            ))
+        if (history_date and _parse_iso_date(history_date)) or (history_product_name or "").strip():
+            return redirect(
+                url_for(
+                    "inventory_in_history",
+                    date=history_date or "",
+                    product_name=history_product_name or "",
+                )
+            )
         return redirect(url_for("inventory_in"))
 
     cur.close()
@@ -535,12 +537,14 @@ def delete_in(in_id):
     conn.commit()
     cur.close()
     conn.close()
-    if history_date and _parse_iso_date(history_date):
-        return redirect(url_for(
-            "inventory_in_history",
-            date=history_date,
-            product_name=history_product_name or "",
-        ))
+    if (history_date and _parse_iso_date(history_date)) or (history_product_name or "").strip():
+        return redirect(
+            url_for(
+                "inventory_in_history",
+                date=history_date or "",
+                product_name=history_product_name or "",
+            )
+        )
     return redirect(url_for("inventory_in"))
 
 
@@ -664,21 +668,21 @@ def import_csv():
 
 @app.route("/inventory_out/history")
 def inventory_out_history():
-    raw = request.args.get("date") or _today_jst_iso()
+    raw = (request.args.get("date") or "").strip()
     product_query = (request.args.get("product_name") or "").strip()
-    view_date = _parse_iso_date(raw) or _parse_iso_date(_today_jst_iso())
-    date_str = view_date.isoformat()
+    view_date = _parse_iso_date(raw)
+    date_str = view_date.isoformat() if view_date else raw
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
         """
         SELECT out_id, product_name, group_name, shipped_quantity, shipped_day
         FROM inventory_out
-        WHERE DATE(timezone('Asia/Tokyo', shipped_day)) = %s
+        WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', shipped_day)) = %s)
           AND (%s = '' OR product_name ILIKE ('%%' || %s || '%%'))
         ORDER BY shipped_day DESC, out_id;
         """,
-        (view_date, product_query, product_query),
+        (view_date, view_date, product_query, product_query),
     )
     rows = cur.fetchall()
     cur.close()
@@ -757,12 +761,14 @@ def edit_out(out_id):
         conn.commit()
         cur.close()
         conn.close()
-        if history_date and _parse_iso_date(history_date):
-            return redirect(url_for(
-                'inventory_out_history',
-                date=history_date,
-                product_name=history_product_name or '',
-            ))
+        if (history_date and _parse_iso_date(history_date)) or (history_product_name or '').strip():
+            return redirect(
+                url_for(
+                    'inventory_out_history',
+                    date=history_date or '',
+                    product_name=history_product_name or '',
+                )
+            )
         return redirect(url_for('inventory_out'))
         
     cur.close()
@@ -787,12 +793,14 @@ def delete_out(out_id):
     cur.close()
     conn.close()
     
-    if history_date and _parse_iso_date(history_date):
-        return redirect(url_for(
-            'inventory_out_history',
-            date=history_date,
-            product_name=history_product_name or '',
-        ))
+    if (history_date and _parse_iso_date(history_date)) or (history_product_name or '').strip():
+        return redirect(
+            url_for(
+                'inventory_out_history',
+                date=history_date or '',
+                product_name=history_product_name or '',
+            )
+        )
     return redirect(url_for('inventory_out'))
             
 
