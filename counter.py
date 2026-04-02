@@ -419,11 +419,9 @@ def register_product():
         product_name = request.form.get('product_name')
         quantity_box = request.form.get('quantity_box')
         unit_price = request.form.get('unit_price')
-        expiry_date_raw = (request.form.get('expiry_date') or '').strip()
         effective_from_raw = (request.form.get('effective_from') or '').strip()
         effective_to_raw = (request.form.get('effective_to') or '').strip()
         pos_code = int(pos_code_raw) if pos_code_raw else None
-        expiry_date = expiry_date_raw if expiry_date_raw else None
         effective_from = effective_from_raw if effective_from_raw else _today_jst_iso()
         effective_to = effective_to_raw if effective_to_raw else None
         
@@ -438,13 +436,13 @@ def register_product():
                 """
                 INSERT INTO products(
                     product_id, pos_code, maker, category_name, shop_name,
-                    group_name, product_name, quantity_box, unit_price, expiry_date,
+                    group_name, product_name, quantity_box, unit_price,
                     effective_from, effective_to
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
                 """,
                 (
                     product_id, pos_code, maker, category_name, shop_name,
-                    group_name, product_name, quantity_box, unit_price, expiry_date,
+                    group_name, product_name, quantity_box, unit_price,
                     effective_from, effective_to
                 ),
             )

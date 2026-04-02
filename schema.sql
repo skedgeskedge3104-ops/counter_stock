@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS products (
     product_name VARCHAR(64) PRIMARY KEY,
     quantity_box INTEGER,
     unit_price NUMERIC(5,2),
-    expiry_date TIMESTAMP,
     effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
     effective_to DATE
 );
@@ -202,6 +201,19 @@ BEGIN
           AND column_name = 'display'
     ) THEN
         ALTER TABLE products DROP COLUMN display;
+    END IF;
+END$$;
+
+-- 既存DB向け: products.expiry_date があれば削除
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'products'
+          AND column_name = 'expiry_date'
+    ) THEN
+        ALTER TABLE products DROP COLUMN expiry_date;
     END IF;
 END$$;
 
