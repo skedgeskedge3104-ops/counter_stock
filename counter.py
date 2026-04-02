@@ -95,6 +95,35 @@ def _jst_current_month_start():
     return datetime.date(now.year, now.month, 1)
 
 
+def _jst_now_naive():
+    """DBに保存するJST基準のnaive datetimeを返す。"""
+    return datetime.datetime.now(pytz.timezone("Asia/Tokyo")).replace(tzinfo=None)
+
+
+def _resolve_price_period(cur, product_name, at_ts):
+    """指定時刻時点で有効な価格期間を1件返す（effective_to は非包含）。"""
+    cur.execute(
+        """
+        SELECT price_period_id, price_group_name, unit_price
+        FROM product_price_periods
+        WHERE product_name = %s
+          AND effective_from <= %s
+          AND (effective_to IS NULL OR %s < effective_to)
+        ORDER BY effective_from DESC, price_period_id DESC
+        LIMIT 1;
+        """,
+        (product_name, at_ts, at_ts),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "price_period_id": row[0],
+        "price_group_name": row[1],
+        "unit_price": row[2],
+    }
+
+
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
     
@@ -346,6 +375,7 @@ def register_product():
         group_names = []
         category_names = []
         shop_names = []
+        today_iso = _today_jst_iso()
         conn = None
         
         try:
@@ -371,10 +401,17 @@ def register_product():
                 cur.close()
             if conn:
                 conn.close()
-        return render_template('register_product.html', group_names=group_names, category_names = category_names,shop_names = shop_names)
+        return render_template(
+            'register_product.html',
+            group_names=group_names,
+            category_names=category_names,
+            shop_names=shop_names,
+            today_iso=today_iso,
+        )
     
     elif request.method == 'POST':
         product_id = request.form.get('product_id')
+        pos_code_raw = (request.form.get('pos_code') or '').strip()
         maker = request.form.get('maker')
         category_name = request.form.get('category_name')
         shop_name = request.form.get('shop_name')
@@ -382,6 +419,13 @@ def register_product():
         product_name = request.form.get('product_name')
         quantity_box = request.form.get('quantity_box')
         unit_price = request.form.get('unit_price')
+        expiry_date_raw = (request.form.get('expiry_date') or '').strip()
+        effective_from_raw = (request.form.get('effective_from') or '').strip()
+        effective_to_raw = (request.form.get('effective_to') or '').strip()
+        pos_code = int(pos_code_raw) if pos_code_raw else None
+        expiry_date = expiry_date_raw if expiry_date_raw else None
+        effective_from = effective_from_raw if effective_from_raw else _today_jst_iso()
+        effective_to = effective_to_raw if effective_to_raw else None
         
         cur = None
         conn = None 
@@ -390,7 +434,29 @@ def register_product():
             conn = get_db_connection()
             cur = conn.cursor()
             
-            cur.execute("INSERT INTO products(product_id, maker, category_name, shop_name, group_name, product_name, quantity_box, unit_price,expiry_date) VALUES (%s, %s, %s,  %s, %s, %s, %s, %s, timezone('Asia/Tokyo',now()));", (product_id, maker, category_name, shop_name, group_name, product_name, quantity_box, unit_price,))
+            cur.execute(
+                """
+                INSERT INTO products(
+                    product_id, pos_code, maker, category_name, shop_name,
+                    group_name, product_name, quantity_box, unit_price, expiry_date,
+                    effective_from, effective_to
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """,
+                (
+                    product_id, pos_code, maker, category_name, shop_name,
+                    group_name, product_name, quantity_box, unit_price, expiry_date,
+                    effective_from, effective_to
+                ),
+            )
+            now_jst = _jst_now_naive()
+            cur.execute(
+                """
+                INSERT INTO product_price_periods (
+                    product_name, price_group_name, unit_price, effective_from, effective_to
+                ) VALUES (%s, %s, %s, %s, NULL);
+                """,
+                (product_name, group_name, unit_price, now_jst),
+            )
             
             conn.commit()
             
@@ -411,14 +477,20 @@ def register_product():
 @app.route('/register_product_list', methods=['GET', 'POST'])
 def register_product_list():
     selected_category = (request.args.get('category_name') or '').strip()
+    selected_tab = (request.args.get('tab') or request.form.get('tab') or 'active').strip()
+    if selected_tab not in ('active', 'future', 'expired', 'all'):
+        selected_tab = 'active'
 
     if request.method == 'POST':
         selected_category = (request.form.get('category_name') or '').strip()
         product_name = request.form.get('product_name')
         pos_code_raw = (request.form.get('pos_code') or '').strip()
-        display = request.form.get('display') == 'on'
+        effective_from_raw = (request.form.get('effective_from') or '').strip()
+        effective_to_raw = (request.form.get('effective_to') or '').strip()
 
         pos_code = int(pos_code_raw) if pos_code_raw else None
+        effective_from = effective_from_raw if effective_from_raw else _today_jst_iso()
+        effective_to = effective_to_raw if effective_to_raw else None
 
         conn = None
         cur = None
@@ -428,10 +500,10 @@ def register_product_list():
             cur.execute(
                 """
                 UPDATE products
-                SET pos_code = %s, display = %s
+                SET pos_code = %s, effective_from = %s, effective_to = %s
                 WHERE product_name = %s;
                 """,
-                (pos_code, display, product_name),
+                (pos_code, effective_from, effective_to, product_name),
             )
             conn.commit()
         except Exception as e:
@@ -444,7 +516,7 @@ def register_product_list():
             if conn:
                 conn.close()
 
-        return redirect(url_for('register_product_list', category_name=selected_category))
+        return redirect(url_for('register_product_list', category_name=selected_category, tab=selected_tab))
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -457,12 +529,21 @@ def register_product_list():
 
     products = []
     if selected_category:
+        tab_where = ""
+        if selected_tab == 'active':
+            tab_where = "AND effective_from <= CURRENT_DATE AND (effective_to IS NULL OR CURRENT_DATE < effective_to)"
+        elif selected_tab == 'future':
+            tab_where = "AND CURRENT_DATE < effective_from"
+        elif selected_tab == 'expired':
+            tab_where = "AND effective_to IS NOT NULL AND effective_to <= CURRENT_DATE"
+
         cur.execute(
-            """
-            SELECT product_name, group_name, pos_code, display
+            f"""
+            SELECT product_name, group_name, pos_code, effective_from, effective_to
             FROM products
             WHERE category_name = %s
-            ORDER BY product_name;
+            {tab_where}
+            ORDER BY effective_from DESC, product_name;
             """,
             (selected_category,),
         )
@@ -475,6 +556,7 @@ def register_product_list():
         'register_product_list.html',
         categories=categories,
         selected_category=selected_category,
+        selected_tab=selected_tab,
         products=products,
     )
 
@@ -631,7 +713,26 @@ def inventory_in():
         cur.execute('SELECT category_name FROM categories ORDER BY category_name;')
         category_names = [row[0] for row in cur.fetchall()]
 
-        cur.execute("SELECT * FROM inventory_in WHERE DATE(received_day) = DATE(timezone('Asia/Tokyo',now())); ")
+        cur.execute(
+            """
+            SELECT
+                i.in_id,
+                p.pos_code,
+                p.product_name,
+                i.received_quantity AS box_count,
+                (i.received_quantity * COALESCE(p.quantity_box, 1))::integer AS piece_count,
+                DATE(timezone('Asia/Tokyo', i.received_day)) AS received_date
+            FROM inventory_in AS i
+            INNER JOIN products AS p
+                ON p.product_name = i.product_name
+               AND p.group_name = i.group_name
+            WHERE DATE(timezone('Asia/Tokyo', i.received_day)) = DATE(timezone('Asia/Tokyo', now()))
+            ORDER BY
+                p.pos_code NULLS LAST,
+                p.product_name,
+                i.in_id;
+            """
+        )
         inventory_in = cur.fetchall()
         
         cur.execute("SELECT p.group_name, SUM(i_in.received_quantity)*p.quantity_box AS 入庫合計 FROM inventory_in AS i_in LEFT JOIN products AS p ON p.product_name = i_in.product_name WHERE DATE(i_in.received_day)=DATE(TIMEZONE('Asia/Tokyo',Now())) GROUP BY i_in.received_quantity,p.group_name, p.quantity_box; ")
@@ -657,8 +758,26 @@ def inventory_in():
         try:
             conn = get_db_connection()
             cur = conn.cursor()
-            
-            cur.execute("INSERT INTO inventory_in(group_name, product_name,received_quantity,received_day) VALUES (%s, %s, %s, timezone('Asia/Tokyo',now()));", (group_name, product_name,received_quantity,))
+
+            now_jst = _jst_now_naive()
+            period = _resolve_price_period(cur, product_name, now_jst)
+            if not period:
+                return "error:有効な価格期間が未設定です。先に価格期間を登録してください。"
+
+            cur.execute(
+                """
+                INSERT INTO inventory_in(
+                    group_name, product_name, price_period_id, received_quantity, received_day
+                ) VALUES (%s, %s, %s, %s, %s);
+                """,
+                (
+                    group_name,
+                    product_name,
+                    period["price_period_id"],
+                    received_quantity,
+                    now_jst,
+                ),
+            )
             
             conn.commit()
             
@@ -816,7 +935,26 @@ def inventory_out():
         cur.execute('SELECT category_name FROM categories ORDER BY category_name;')
         category_names = [row[0] for row in cur.fetchall()]
 
-        cur.execute("SELECT * FROM inventory_out WHERE DATE(shipped_day)=DATE(timezone('Asia/Tokyo',now()));")
+        cur.execute(
+            """
+            SELECT
+                o.out_id,
+                p.pos_code,
+                p.product_name,
+                o.shipped_quantity AS box_count,
+                (o.shipped_quantity * COALESCE(p.quantity_box, 1))::integer AS piece_count,
+                DATE(timezone('Asia/Tokyo', o.shipped_day)) AS shipped_date
+            FROM inventory_out AS o
+            INNER JOIN products AS p
+                ON p.product_name = o.product_name
+               AND p.group_name = o.group_name
+            WHERE DATE(timezone('Asia/Tokyo', o.shipped_day)) = DATE(timezone('Asia/Tokyo', now()))
+            ORDER BY
+                p.pos_code NULLS LAST,
+                p.product_name,
+                o.out_id;
+            """
+        )
         inventory_out = cur.fetchall()
 
         
@@ -825,8 +963,25 @@ def inventory_out():
             product_name = request.form.get('product_name')
             shipped_quantity = request.form.get('shipped_quantity')
             
-          
-            cur.execute("INSERT INTO inventory_out (group_name,product_name,shipped_quantity,shipped_day) VALUES (%s,%s,%s,timezone('Asia/Tokyo', now()));", (group_name,product_name,shipped_quantity,))
+            now_jst = _jst_now_naive()
+            period = _resolve_price_period(cur, product_name, now_jst)
+            if not period:
+                return "error:有効な価格期間が未設定です。先に価格期間を登録してください。"
+
+            cur.execute(
+                """
+                INSERT INTO inventory_out (
+                    group_name, product_name, price_period_id, shipped_quantity, shipped_day
+                ) VALUES (%s, %s, %s, %s, %s);
+                """,
+                (
+                    group_name,
+                    product_name,
+                    period["price_period_id"],
+                    shipped_quantity,
+                    now_jst,
+                ),
+            )
             
             conn.commit()
             
@@ -923,7 +1078,8 @@ def get_product_names(group_name):
         SELECT product_name
         FROM products
         WHERE group_name = %s
-          AND COALESCE(display, TRUE) = TRUE;
+          AND effective_from <= CURRENT_DATE
+          AND (effective_to IS NULL OR CURRENT_DATE < effective_to);
         """,
         (group_name,),
     )
@@ -945,7 +1101,8 @@ def api_group_names_by_category(category):
         FROM products p
         INNER JOIN group_by_counts g ON p.group_name = g.group_name
         WHERE p.category_name = %s
-          AND COALESCE(p.display, TRUE) = TRUE
+          AND p.effective_from <= CURRENT_DATE
+          AND (p.effective_to IS NULL OR CURRENT_DATE < p.effective_to)
         GROUP BY p.group_name, g.group_no
         ORDER BY g.group_no, p.group_name;
         """,
@@ -970,7 +1127,8 @@ def get_product_names_for():
         """
         SELECT product_name FROM products
         WHERE category_name = %s AND group_name = %s
-          AND COALESCE(display, TRUE) = TRUE
+          AND effective_from <= CURRENT_DATE
+          AND (effective_to IS NULL OR CURRENT_DATE < effective_to)
         ORDER BY product_no, product_name;
         """,
         (category, group_name),
@@ -1113,7 +1271,8 @@ LEFT JOIN (
     FROM inventory_out GROUP BY product_name, group_name
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
 WHERE p.category_name = %s
-  AND COALESCE(p.display, TRUE) = TRUE
+  AND p.effective_from <= CURRENT_DATE
+  AND (p.effective_to IS NULL OR CURRENT_DATE < p.effective_to)
 ORDER BY p.product_no;
 """
 
@@ -1132,7 +1291,8 @@ LEFT JOIN (
     FROM inventory_out GROUP BY product_name, group_name
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
 WHERE p.category_name = %s
-  AND COALESCE(p.display, TRUE) = TRUE
+  AND p.effective_from <= CURRENT_DATE
+  AND (p.effective_to IS NULL OR CURRENT_DATE < p.effective_to)
 ORDER BY
     p.pos_code NULLS LAST,
     p.product_name;
@@ -1156,7 +1316,8 @@ LEFT JOIN (
     FROM inventory_out GROUP BY product_name, group_name
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
 WHERE p.category_name = %s
-  AND COALESCE(p.display, TRUE) = TRUE
+  AND p.effective_from <= CURRENT_DATE
+  AND (p.effective_to IS NULL OR CURRENT_DATE < p.effective_to)
 GROUP BY g.group_name, g.group_no
 ORDER BY g.group_no;
 """
@@ -1176,7 +1337,8 @@ LEFT JOIN (
     FROM inventory_out GROUP BY product_name, group_name
 ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
 WHERE p.category_name = %s
-  AND COALESCE(p.display, TRUE) = TRUE
+  AND p.effective_from <= CURRENT_DATE
+  AND (p.effective_to IS NULL OR CURRENT_DATE < p.effective_to)
 GROUP BY g.group_name, g.group_no
 ORDER BY g.group_no;
 """
@@ -1185,7 +1347,8 @@ _USED_IN_OUT_PRODUCTS_SQL = """
 SELECT p.product_name, COALESCE(p.quantity_box, 1) AS quantity_box
 FROM products p
 WHERE p.category_name = %s AND p.group_name = %s
-AND COALESCE(p.display, TRUE) = TRUE
+AND p.effective_from <= CURRENT_DATE
+AND (p.effective_to IS NULL OR CURRENT_DATE < p.effective_to)
 AND p.pos_code IS NOT NULL
 AND (
     EXISTS (
@@ -1312,7 +1475,8 @@ def _build_snack_drink_result_rows(stored):
                 FROM inventory_out GROUP BY product_name, group_name
             ) o ON p.product_name = o.product_name AND p.group_name = o.group_name
             WHERE p.category_name IN %s
-              AND COALESCE(p.display, TRUE) = TRUE
+              AND p.effective_from <= CURRENT_DATE
+              AND (p.effective_to IS NULL OR CURRENT_DATE < p.effective_to)
             ORDER BY p.category_name, p.group_name, p.pos_code NULLS LAST, p.product_name;
             """,
             (tuple(SNACK_DRINK_CATEGORIES),),
@@ -1938,11 +2102,13 @@ def analysis_cost_ratio():
 
     cur.execute(
         """SELECT
-        SUM(i.received_quantity * p.unit_price * p.quantity_box)
+        SUM(i.received_quantity * COALESCE(pp.unit_price, p.unit_price) * p.quantity_box)
             / NULLIF(SUM(i.received_quantity * g.values * p.quantity_box), 0) AS 原価率
         FROM inventory_in i
         INNER JOIN products p ON p.product_name = i.product_name
-        INNER JOIN group_by_counts g ON g.group_name = p.group_name
+        LEFT JOIN product_price_periods pp ON pp.price_period_id = i.price_period_id
+        INNER JOIN group_by_counts g
+            ON g.group_name = COALESCE(pp.price_group_name, p.group_name)
         WHERE p.category_name IN %s;
         """,
         (tuple(SNACK_DRINK_CATEGORIES),),

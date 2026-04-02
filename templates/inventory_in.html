@@ -43,20 +43,22 @@
     <table style="width: 90%;  text-align: center; margin: 50px auto;" >
         <thead>
             <tr>
-                <th>玉数名</th>
-                <th>商品名</th>
-                <th>入庫数</th>
-                <th>入庫日</th>
+                <th>日付</th>
+                <th>pos-code</th>
+                <th>product_name</th>
+                <th>箱数</th>
+                <th>個数</th>
                 <th>操作</th>
             </tr>
         </thead>
         <tbody>
             {% for item in inventory_in %}
             <tr>
+                <td>{{ item[5]|md_display_jp }}</td>
+                <td>{{ item[1] if item[1] is not none else '—' }}</td>
                 <td>{{ item[2] }}</td>
-                <td>{{ item[1] }}</td>
                 <td>{{ item[3] }}</td>
-                <td>{{ item[4]|ts_display }}</td>
+                <td>{{ item[4] }}</td>
                 <td>
                     <form action="{{ url_for('edit_in', in_id=item[0]) }}" method="get" style="display:inline;">
                         <button type="submit" class="btn-compact-action">編集</button>
