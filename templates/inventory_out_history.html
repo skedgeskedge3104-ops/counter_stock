@@ -38,10 +38,10 @@
     </thead>
     <tbody>
         {% for g in groups %}
-        {% for item in g.items %}
+        {% for item in g['items'] %}
         <tr>
             {% if loop.first %}
-            <td rowspan="{{ g.items|length }}">{{ g.received_date|md_display_jp }}</td>
+            <td rowspan="{{ g['items']|length }}">{{ g.received_date|md_display_jp }}</td>
             {% endif %}
             <td>{{ item.pos_code if item.pos_code is not none else '—' }}</td>
             <td>{{ item.product_name }}</td>
