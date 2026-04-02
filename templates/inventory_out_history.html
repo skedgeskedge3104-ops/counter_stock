@@ -22,37 +22,43 @@
 
 {% if not has_filter %}
 <p>日付または商品名を指定して「表示」を押してください。</p>
-{% elif rows|length == 0 %}
+{% elif groups|length == 0 %}
 <p>該当する出庫履歴はありません。</p>
 {% else %}
 <table border="1" style="border-collapse: collapse; width: 90%; margin: 1rem auto; text-align: center;">
     <thead>
         <tr>
-            <th>玉数</th>
-            <th>商品名</th>
-            <th>出庫数</th>
-            <th>日時</th>
-            <th>操作</th>
+            <th>日付</th>
+            <th>pos-code</th>
+            <th>product_name</th>
+            <th>箱数</th>
+            <th>個数</th>
+            <th>編集</th>
         </tr>
     </thead>
     <tbody>
-        {% for item in rows %}
+        {% for g in groups %}
+        {% for item in g.items %}
         <tr>
-            <td>{{ item[2] }}</td>
-            <td>{{ item[1] }}</td>
-            <td>{{ item[3] }}</td>
-            <td>{{ item[4]|ts_display }}</td>
+            {% if loop.first %}
+            <td rowspan="{{ g.items|length }}">{{ g.received_date|md_display_jp }}</td>
+            {% endif %}
+            <td>{{ item.pos_code if item.pos_code is not none else '—' }}</td>
+            <td>{{ item.product_name }}</td>
+            <td>{{ item.box_count }}</td>
+            <td>{{ item.piece_count }}</td>
             <td>
-                <form action="{{ url_for('edit_out', out_id=item[0], history_date=selected_date, history_product_name=product_name) }}" method="get" style="display:inline;">
+                <form action="{{ url_for('edit_out', out_id=item.out_id, history_date=selected_date, history_product_name=product_name) }}" method="get" style="display:inline;">
                     <button type="submit" class="btn-compact-action">編集</button>
                 </form>
-                <form action="{{ url_for('delete_out', out_id=item[0]) }}" method="post" style="display:inline;" onsubmit="return confirm('削除しますか？');">
+                <form action="{{ url_for('delete_out', out_id=item.out_id) }}" method="post" style="display:inline;" onsubmit="return confirm('削除しますか？');">
                     <input type="hidden" name="history_date" value="{{ selected_date }}">
                     <input type="hidden" name="history_product_name" value="{{ product_name or '' }}">
                     <button type="submit" class="btn-compact-action">削除</button>
                 </form>
             </td>
         </tr>
+        {% endfor %}
         {% endfor %}
     </tbody>
 </table>

@@ -43,6 +43,34 @@ def ts_display_filter(value):
     return _format_ts_display(value)
 
 
+def _format_md_jp_display(value):
+    """日付を '4月2日' 形式で表示（日本時間の JST 日付想定）。"""
+    if value is None:
+        return ''
+
+    d = None
+    if isinstance(value, datetime.datetime):
+        d = value.date()
+    elif isinstance(value, datetime.date):
+        d = value
+    else:
+        s = str(value).strip().replace('T', ' ')
+        if len(s) >= 10:
+            try:
+                d = datetime.date.fromisoformat(s[:10])
+            except (ValueError, TypeError):
+                d = None
+
+    if d is None:
+        return str(value)
+    return f"{int(d.month)}月{int(d.day)}日"
+
+
+@app.template_filter('md_display_jp')
+def md_display_jp_filter(value):
+    return _format_md_jp_display(value)
+
+
 def _today_jst_iso():
     return datetime.datetime.now(pytz.timezone("Asia/Tokyo")).date().isoformat()
 
@@ -463,26 +491,62 @@ def inventory_in_history():
     view_date = _parse_iso_date(raw)
     date_str = view_date.isoformat() if view_date else raw
     has_filter = bool(view_date) or bool(product_query)
-    rows = []
+    groups = []
     if has_filter:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT in_id, product_name, group_name, received_quantity, received_day
-            FROM inventory_in
-            WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', received_day)) = %s)
-              AND (%s = '' OR product_name ILIKE ('%%' || %s || '%%'))
-            ORDER BY received_day DESC, in_id;
+            SELECT
+                i.in_id,
+                p.pos_code,
+                p.product_name,
+                i.received_quantity AS box_count,
+                (i.received_quantity * COALESCE(p.quantity_box, 1))::integer AS piece_count,
+                DATE(timezone('Asia/Tokyo', i.received_day)) AS received_date
+            FROM inventory_in AS i
+            INNER JOIN products AS p
+                ON p.product_name = i.product_name
+               AND p.group_name = i.group_name
+            WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', i.received_day)) = %s)
+              AND (%s = '' OR p.product_name ILIKE ('%%' || %s || '%%'))
+            ORDER BY
+                received_date DESC,
+                p.pos_code NULLS LAST,
+                p.product_name,
+                i.in_id;
             """,
             (view_date, view_date, product_query, product_query),
         )
         rows = cur.fetchall()
         cur.close()
         conn.close()
+
+        current_date = None
+        current_items = []
+        for r in rows:
+            in_id, pos_code, pname, box_count, piece_count, received_date = r
+            if current_date != received_date:
+                if current_items:
+                    groups.append({"received_date": current_date, "items": current_items})
+                current_date = received_date
+                current_items = []
+
+            current_items.append(
+                {
+                    "in_id": in_id,
+                    "pos_code": pos_code,
+                    "product_name": pname,
+                    "box_count": box_count,
+                    "piece_count": piece_count,
+                }
+            )
+        if current_items:
+            groups.append({"received_date": current_date, "items": current_items})
+
     return render_template(
         "inventory_in_history.html",
-        rows=rows,
+        groups=groups,
         selected_date=date_str,
         product_name=product_query,
         has_filter=has_filter,
@@ -677,26 +741,63 @@ def inventory_out_history():
     view_date = _parse_iso_date(raw)
     date_str = view_date.isoformat() if view_date else raw
     has_filter = bool(view_date) or bool(product_query)
-    rows = []
+    groups = []
     if has_filter:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT out_id, product_name, group_name, shipped_quantity, shipped_day
-            FROM inventory_out
-            WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', shipped_day)) = %s)
-              AND (%s = '' OR product_name ILIKE ('%%' || %s || '%%'))
-            ORDER BY shipped_day DESC, out_id;
+            SELECT
+                o.out_id,
+                p.pos_code,
+                p.product_name,
+                o.shipped_quantity AS box_count,
+                (o.shipped_quantity * COALESCE(p.quantity_box, 1))::integer AS piece_count,
+                DATE(timezone('Asia/Tokyo', o.shipped_day)) AS shipped_date
+            FROM inventory_out AS o
+            INNER JOIN products AS p
+                ON p.product_name = o.product_name
+               AND p.group_name = o.group_name
+            WHERE (%s IS NULL OR DATE(timezone('Asia/Tokyo', o.shipped_day)) = %s)
+              AND (%s = '' OR p.product_name ILIKE ('%%' || %s || '%%'))
+            ORDER BY
+                shipped_date DESC,
+                p.pos_code NULLS LAST,
+                p.product_name,
+                o.out_id;
             """,
             (view_date, view_date, product_query, product_query),
         )
         rows = cur.fetchall()
         cur.close()
         conn.close()
+
+        current_date = None
+        current_items = []
+        for r in rows:
+            out_id, pos_code, pname, box_count, piece_count, shipped_date = r
+            if current_date != shipped_date:
+                if current_items:
+                    groups.append(
+                        {"received_date": current_date, "items": current_items}
+                    )
+                current_date = shipped_date
+                current_items = []
+
+            current_items.append(
+                {
+                    "out_id": out_id,
+                    "pos_code": pos_code,
+                    "product_name": pname,
+                    "box_count": box_count,
+                    "piece_count": piece_count,
+                }
+            )
+        if current_items:
+            groups.append({"received_date": current_date, "items": current_items})
     return render_template(
         "inventory_out_history.html",
-        rows=rows,
+        groups=groups,
         selected_date=date_str,
         product_name=product_query,
         has_filter=has_filter,
