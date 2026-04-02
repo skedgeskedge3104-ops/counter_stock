@@ -1117,6 +1117,27 @@ WHERE p.category_name = %s
 ORDER BY p.product_no;
 """
 
+_INVENTORY_CHECK_TOBACCO_PRODUCTS_SQL = """
+SELECT
+    p.product_name,
+    p.group_name,
+    (COALESCE(i.total_in, 0) - COALESCE(o.total_out, 0)) * p.quantity_box AS db_stock
+FROM products p
+LEFT JOIN (
+    SELECT product_name, group_name, SUM(received_quantity) AS total_in
+    FROM inventory_in GROUP BY product_name, group_name
+) i ON p.product_name = i.product_name AND p.group_name = i.group_name
+LEFT JOIN (
+    SELECT product_name, group_name, SUM(shipped_quantity) AS total_out
+    FROM inventory_out GROUP BY product_name, group_name
+) o ON p.product_name = o.product_name AND p.group_name = o.group_name
+WHERE p.category_name = %s
+  AND COALESCE(p.display, TRUE) = TRUE
+ORDER BY
+    p.pos_code NULLS LAST,
+    p.product_name;
+"""
+
 # ポイント景品: 商品別在庫 = 入庫×入り数 − 出庫（出庫は入り数を掛けない）をグループで合計
 _POINTS_STOCK_BY_GROUP_SQL = """
 SELECT
@@ -1244,14 +1265,25 @@ def _build_inventory_check_result_rows(category_name, temp_data):
             "counted_count": vals["counted_count"],
             "total_count": total_count,
         })
-    rows.sort(
-        key=lambda r: (
-            r["group_name"],
-            1 if r["pos_code"] is None else 0,
-            r["pos_code"] if r["pos_code"] is not None else 0,
-            r["product_name"],
+    # たばこだけ、POS-code 昇順で並べ替え（お菓子/ドリンクの結果と同じ並び順）
+    if category_name == "たばこ":
+        rows.sort(
+            key=lambda r: (
+                1 if r["pos_code"] is None else 0,
+                r["pos_code"] if r["pos_code"] is not None else 0,
+                r["group_name"],
+                r["product_name"],
+            )
         )
-    )
+    else:
+        rows.sort(
+            key=lambda r: (
+                r["group_name"],
+                1 if r["pos_code"] is None else 0,
+                r["pos_code"] if r["pos_code"] is not None else 0,
+                r["product_name"],
+            )
+        )
     return rows
 
 
@@ -1825,7 +1857,10 @@ def inventory_check(category):
             point_groups=point_groups
         )
 
-    cur.execute(_INVENTORY_CHECK_PRODUCTS_SQL, (category,))
+    sql = _INVENTORY_CHECK_PRODUCTS_SQL
+    if category == "たばこ":
+        sql = _INVENTORY_CHECK_TOBACCO_PRODUCTS_SQL
+    cur.execute(sql, (category,))
     db_products = cur.fetchall()
     cur.close()
     conn.close()
