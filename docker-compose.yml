@@ -36,12 +36,12 @@ services:
       - "8081:8081" # ホストの8080ポートをコンテナの8080ポートにマッピング
     environment:
       #   # アプリケーションがデータベースに接続するための情報
-      DATABASE_URL: postgresql://user:futaba0127@db:5432/counter_db
+      # DATABASE_URL: postgresql://user:futaba0127@db:5432/counter_db
 
 
 
       #  # 本番環境
-      #  DATABASE_URL: postgresql://counter_db_ylpz_user:XIHjUtzxnAmaUhgz5qX81Z3MejkV4pJZ@dpg-d5m6cq63jp1c739sk5k0-a/counter_db_ylpz
+       DATABASE_URL: postgresql://counter_db_ylpz_user:XIHjUtzxnAmaUhgz5qX81Z3MejkV4pJZ@dpg-d5m6cq63jp1c739sk5k0-a/counter_db_ylpz
 
     command: ["./wait-for-it.sh", "db:5432", "--", "gunicorn", "counter:app", "-b", "0.0.0.0:8081" , "--reload"] 
     # dbサービスが起動してからwebサービスを起動
