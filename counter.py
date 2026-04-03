@@ -124,6 +124,34 @@ def _resolve_price_period(cur, product_name, at_ts):
     }
 
 
+def _ensure_price_period(cur, product_name, group_name, at_ts):
+    """入出庫用に価格期間を解決する。product_price_periods が無ければ products から補完して作成する。"""
+    period = _resolve_price_period(cur, product_name, at_ts)
+    if period:
+        return period
+    cur.execute(
+        """
+        SELECT group_name, unit_price
+        FROM products
+        WHERE product_name = %s AND group_name = %s;
+        """,
+        (product_name, group_name),
+    )
+    row = cur.fetchone()
+    if not row or row[1] is None:
+        return None
+    price_group_name, unit_price = row[0], row[1]
+    cur.execute(
+        """
+        INSERT INTO product_price_periods (
+            product_name, price_group_name, unit_price, effective_from, effective_to
+        ) VALUES (%s, %s, %s, %s, NULL);
+        """,
+        (product_name, price_group_name, unit_price, at_ts),
+    )
+    return _resolve_price_period(cur, product_name, at_ts)
+
+
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
     
@@ -758,9 +786,12 @@ def inventory_in():
             cur = conn.cursor()
 
             now_jst = _jst_now_naive()
-            period = _resolve_price_period(cur, product_name, now_jst)
+            period = _ensure_price_period(cur, product_name, group_name, now_jst)
             if not period:
-                return "error:有効な価格期間が未設定です。先に価格期間を登録してください。"
+                return (
+                    "error:価格期間（product_price_periods）がありません。"
+                    "商品の単価が登録されているか、玉数と商品名の組み合わせが正しいか確認してください。"
+                )
 
             cur.execute(
                 """
@@ -962,9 +993,12 @@ def inventory_out():
             shipped_quantity = request.form.get('shipped_quantity')
             
             now_jst = _jst_now_naive()
-            period = _resolve_price_period(cur, product_name, now_jst)
+            period = _ensure_price_period(cur, product_name, group_name, now_jst)
             if not period:
-                return "error:有効な価格期間が未設定です。先に価格期間を登録してください。"
+                return (
+                    "error:価格期間（product_price_periods）がありません。"
+                    "商品の単価が登録されているか、玉数と商品名の組み合わせが正しいか確認してください。"
+                )
 
             cur.execute(
                 """

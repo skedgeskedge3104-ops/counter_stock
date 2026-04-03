@@ -41,6 +41,7 @@ services:
 
 
       #  # 本番環境
+      
        DATABASE_URL: postgresql://counter_db_ylpz_user:XIHjUtzxnAmaUhgz5qX81Z3MejkV4pJZ@dpg-d5m6cq63jp1c739sk5k0-a/counter_db_ylpz
 
     command: ["./wait-for-it.sh", "db:5432", "--", "gunicorn", "counter:app", "-b", "0.0.0.0:8081" , "--reload"] 
