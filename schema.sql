@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS products (
         REFERENCES group_by_counts(group_name),
     product_name VARCHAR(64) PRIMARY KEY,
     quantity_box INTEGER,
-    unit_price NUMERIC(5,2),
+    unit_price NUMERIC(10,2),
     effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
     effective_to DATE
 );
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS product_price_periods (
         REFERENCES products(product_name),
     price_group_name VARCHAR(16) NOT NULL
         REFERENCES group_by_counts(group_name),
-    unit_price NUMERIC(5,2) NOT NULL,
+    unit_price NUMERIC(10,2) NOT NULL,
     effective_from TIMESTAMP NOT NULL,
     effective_to TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -50,7 +50,9 @@ CREATE TABLE IF NOT EXISTS product_price_periods (
 CREATE INDEX IF NOT EXISTS idx_price_periods_product_from
     ON product_price_periods(product_name, effective_from DESC);
 
-
+-- 単価: NUMERIC(5,2) は 999.99 上限のため 1000 以上で overflow する。既存DBも拡張する。
+ALTER TABLE products ALTER COLUMN unit_price TYPE NUMERIC(10,2);
+ALTER TABLE product_price_periods ALTER COLUMN unit_price TYPE NUMERIC(10,2);
 
 
 DO $$
