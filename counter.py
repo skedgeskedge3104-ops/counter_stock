@@ -1382,16 +1382,6 @@ WHERE p.category_name = %s AND p.group_name = %s
 AND p.effective_from <= CURRENT_DATE
 AND (p.effective_to IS NULL OR CURRENT_DATE < p.effective_to)
 AND p.pos_code IS NOT NULL
-AND (
-    EXISTS (
-        SELECT 1 FROM inventory_in i
-        WHERE i.product_name = p.product_name AND i.group_name = p.group_name
-    )
-    OR EXISTS (
-        SELECT 1 FROM inventory_out o
-        WHERE o.product_name = p.product_name AND o.group_name = p.group_name
-    )
-)
 ORDER BY p.pos_code, p.product_name;
 """
 
