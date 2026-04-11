@@ -900,7 +900,8 @@ def inventory_out_history():
                 p.pos_code,
                 p.product_name,
                 o.shipped_quantity AS box_count,
-                (o.shipped_quantity * COALESCE(p.quantity_box, 1))::integer AS piece_count,
+                (CASE WHEN p.category_name = %s THEN o.shipped_quantity
+                 ELSE (o.shipped_quantity * COALESCE(p.quantity_box, 1)) END)::integer AS piece_count,
                 DATE(timezone('Asia/Tokyo', o.shipped_day)) AS shipped_date
             FROM inventory_out AS o
             INNER JOIN products AS p
@@ -914,7 +915,7 @@ def inventory_out_history():
                 p.product_name,
                 o.out_id;
             """,
-            (view_date, view_date, product_query, product_query),
+            (POINT_PRIZE_CATEGORY, view_date, view_date, product_query, product_query),
         )
         rows = cur.fetchall()
         cur.close()
@@ -971,7 +972,8 @@ def inventory_out():
                 p.pos_code,
                 p.product_name,
                 o.shipped_quantity AS box_count,
-                (o.shipped_quantity * COALESCE(p.quantity_box, 1))::integer AS piece_count,
+                (CASE WHEN p.category_name = %s THEN o.shipped_quantity
+                 ELSE (o.shipped_quantity * COALESCE(p.quantity_box, 1)) END)::integer AS piece_count,
                 DATE(timezone('Asia/Tokyo', o.shipped_day)) AS shipped_date
             FROM inventory_out AS o
             INNER JOIN products AS p
@@ -982,7 +984,8 @@ def inventory_out():
                 p.pos_code NULLS LAST,
                 p.product_name,
                 o.out_id;
-            """
+            """,
+            (POINT_PRIZE_CATEGORY,),
         )
         inventory_out = cur.fetchall()
 
