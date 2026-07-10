@@ -1,57 +1,54 @@
-# docker-compose.yml
-
-version: '3.8'
-
-
 services:
-  # データベースサービス (PostgreSQL)
   db:
-    # ... dbの設定 ...
+    image: postgres:15-alpine
+    restart: always
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d counter_db"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
       interval: 15s
       timeout: 15s
       retries: 15
-    image: postgres:15-alpine # 軽量なPostgreSQLイメージを使用
-    restart: always
 
-    ports:
-     - "5432:5432"
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: futaba0127
-      POSTGRES_DB: counter_db
-    # データ永続化のため、ボリュームを使用（コンテナを削除してもデータが残る）
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_v2:/var/lib/postgresql/data
 
-
-  # アプリケーションサービス (Flask + Gunicorn)
   web:
-    volumes:
-    - .:/app
-    build: . # カレントディレクトリのDockerfileを使用
+    build: .
     restart: always
+
+    volumes:
+      - .:/app
+
     ports:
-      - "8081:8081" # ホストの8080ポートをコンテナの8080ポートにマッピング
+      - "8082:8081"
+
     environment:
-      #   # アプリケーションがデータベースに接続するための情報
-      # DATABASE_URL: postgresql://user:futaba0127@db:5432/counter_db
+      DATABASE_URL: ${DATABASE_URL}
 
+    command:
+      [
+        "./wait-for-it.sh",
+        "db:5432",
+        "--",
+        "gunicorn",
+        "counter:app",
+        "-b",
+        "0.0.0.0:8081",
+        "--reload"
+      ]
 
-
-      #  # 本番環境
-      
-       DATABASE_URL: postgresql://counter_db_ylpz_user:XIHjUtzxnAmaUhgz5qX81Z3MejkV4pJZ@dpg-d5m6cq63jp1c739sk5k0-a/counter_db_ylpz
-
-    command: ["./wait-for-it.sh", "db:5432", "--", "gunicorn", "counter:app", "-b", "0.0.0.0:8081" , "--reload"] 
-    # dbサービスが起動してからwebサービスを起動
     depends_on:
       db:
-        condition: service_healthy # dbサービスがhealthcheckをパスするまで待つ
-    # Gunicornを使ってapp.py内のappインスタンスを起動
-    # command: gunicorn --bind 0.0.0.0:8080 app:app
-
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  postgres_data_v2:

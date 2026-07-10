@@ -2,3 +2,5 @@ __pycache__
 *.pyc
 .env
 venv
+.env.*
+counter_stock_v2_backup.tar.gz
